@@ -4,6 +4,8 @@ import com.example.data.local.dao.GatewayConfigDao
 import com.example.data.local.entity.PaymentEntity
 import com.example.data.network.model.PaymentEventDto
 import com.example.data.network.model.PosAckResponse
+import android.content.Context
+import com.example.security.GatewaySecretStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,6 +18,7 @@ import java.util.concurrent.TimeUnit
 
 class HttpPosGateway(
     private val configDao: GatewayConfigDao,
+    private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
