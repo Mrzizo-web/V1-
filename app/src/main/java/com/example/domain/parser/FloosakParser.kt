@@ -3,58 +3,18 @@ package com.example.domain.parser
 import com.example.domain.model.PaymentCandidate
 import com.example.domain.model.WalletType
 
-/**
- * Dedicated Parser for Floosak wallet (فلوسك).
- * Isolates Floosak-specific rules and allows updating when real sample texts arrive.
- */
-class FloosakParser : BaseWalletParser(WalletType.FLOOSAK, parserVersion = "1.0-floosak") {
-
+class FloosakParser : BaseWalletParser(WalletType.FLOOSAK, parserVersion = "2.0-floosak-real") {
     override val supportedSenders: List<String> = listOf("FLOOSAK", "فلوسك", "YKB")
 
-    override fun parse(
-        smsId: String,
-        sender: String,
-        message: String,
-        receivedAt: Long
-    ): PaymentCandidate {
-        if (isNonTransfer(message)) {
-            return PaymentCandidate(
-                wallet = walletType,
-                amount = null,
-                currency = "YER",
-                transactionId = null,
-                sender = null,
-                senderAccount = null,
-                receivedAt = receivedAt,
-                rawMessage = message,
-                confidence = 0.0f,
-                sourceSmsId = smsId,
-                parserVersion = parserVersion,
-                isFinancialTransfer = false
-            )
+    private val incoming = Regex("""^استلمت حوالة من (.+?) بمبلغ (\d+(?:\.\d+)?) ر\.ي رصيدك (\d+(?:\.\d+)?) ر\.ي$""")
+
+    override fun parse(smsId: String, sender: String, message: String, receivedAt: Long): PaymentCandidate {
+        val text = normalizeDigits(message.trim())
+        val m = incoming.matchEntire(text)
+        val amount = m?.groupValues?.get(2)?.toDoubleOrNull()
+        if (m != null && amount != null && amount > 0) {
+            return PaymentCandidate(WalletType.FLOOSAK, amount, "YER", null, m.groupValues[1].trim(), null, receivedAt, message, 0.90f, smsId, parserVersion, true)
         }
-
-        val amount = extractAmount(message)
-        val transactionId = extractTransactionId(message)
-        val senderParty = extractSenderParty(message)
-
-        var confidence = 0.5f
-        if (amount != null && amount > 0) confidence += 0.3f
-        if (transactionId != null) confidence += 0.2f
-
-        return PaymentCandidate(
-            wallet = walletType,
-            amount = amount,
-            currency = "YER",
-            transactionId = transactionId,
-            sender = senderParty,
-            senderAccount = null,
-            receivedAt = receivedAt,
-            rawMessage = message,
-            confidence = confidence.coerceIn(0.0f, 1.0f),
-            sourceSmsId = smsId,
-            parserVersion = parserVersion,
-            isFinancialTransfer = amount != null && amount > 0
-        )
+        return PaymentCandidate(WalletType.FLOOSAK, null, "YER", null, null, null, receivedAt, message, 0f, smsId, parserVersion, false)
     }
 }
