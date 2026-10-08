@@ -65,7 +65,7 @@ fun SettingsScreen(
     var jeebSender by remember(currentConfig) { mutableStateOf(currentConfig.jeebSenderKeyword) }
     var floosakSender by remember(currentConfig) { mutableStateOf(currentConfig.floosakSenderKeyword) }
     var jawaliSender by remember(currentConfig) { mutableStateOf(currentConfig.jawaliSenderKeyword) }
-    var gatewayToken by remember(currentConfig) { mutableStateOf(currentConfig.gatewayToken) }
+    var gatewayToken by remember(currentConfig) { mutableStateOf("") }
     var newPin by remember(currentConfig) { mutableStateOf("") }
 
     // PIN Authentication Dialog
@@ -314,7 +314,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = gatewayToken,
                     onValueChange = { gatewayToken = it },
-                    label = { Text("Gateway Token") },
+                    label = { Text("Gateway Token (اتركه فارغًا للإبقاء على الحالي)") },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     enabled = isUnlocked
