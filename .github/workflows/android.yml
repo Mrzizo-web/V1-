@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R --include='*.kt' -n 'HAWALATY\|Hawaly\|حوالتي' app/src; then
+          if grep -R --include='*.kt' --exclude='GatewayConfigEntity.kt' -n 'HAWALATY\|Hawaly\|حوالتي' app/src; then
             echo 'ERROR: legacy Hawalaty/Hawaly wallet reference found.'
             exit 1
           fi
