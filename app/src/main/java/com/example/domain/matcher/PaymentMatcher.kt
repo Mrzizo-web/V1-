@@ -26,7 +26,7 @@ class PaymentMatcher(private val paymentDao: PaymentDao) {
     suspend fun matchCandidate(candidate: PaymentCandidate): MatchOutcome {
         val now = System.currentTimeMillis()
         if (!candidate.transactionId.isNullOrBlank()) {
-            val existing = paymentDao.findByTransactionId(candidate.transactionId)
+            val existing = paymentDao.findByTransactionId(candidate.wallet, candidate.transactionId)
             if (existing != null) return MatchOutcome.LinkToExisting(existing, "Exact Transaction ID match: ${candidate.transactionId}")
         }
         val amount = candidate.amount
