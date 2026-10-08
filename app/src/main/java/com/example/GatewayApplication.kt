@@ -33,7 +33,7 @@ class GatewayApplication : Application() {
         super.onCreate()
 
         database = AppDatabase.getInstance(this)
-        configRepository = GatewayConfigRepository(database.gatewayConfigDao())
+        configRepository = GatewayConfigRepository(database.gatewayConfigDao(), this)
         walletDetector = WalletDetector()
         parserRegistry = ParserRegistry()
 
