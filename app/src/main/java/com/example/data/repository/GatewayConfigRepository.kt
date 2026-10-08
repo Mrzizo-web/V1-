@@ -17,6 +17,12 @@ class GatewayConfigRepository(
     }
 
     suspend fun updateConfig(updated: GatewayConfigEntity) {
+        val current = getCurrentConfig()
+        val isFirstRun = current.adminPin.isBlank()
+        val newPin = updated.adminPin
+        require(!isFirstRun || newPin.matches(Regex("\\d{4,6}"))) {
+            "Administrator PIN must be 4-6 numeric digits during first-run setup"
+        }
         configDao.insertOrUpdate(updated)
     }
 
@@ -26,6 +32,7 @@ class GatewayConfigRepository(
 
     suspend fun verifyPin(enteredPin: String): Boolean {
         val current = getCurrentConfig()
-        return current.adminPin == enteredPin
+        if (current.adminPin.isBlank()) return false
+        return enteredPin.length in 4..6 && enteredPin.all(Char::isDigit) && current.adminPin == enteredPin
     }
 }
