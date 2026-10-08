@@ -64,7 +64,8 @@ fun SettingsScreen(
     var retryDelay by remember(currentConfig) { mutableStateOf(currentConfig.retryDelaySeconds.toString()) }
     var jeebSender by remember(currentConfig) { mutableStateOf(currentConfig.jeebSenderKeyword) }
     var floosakSender by remember(currentConfig) { mutableStateOf(currentConfig.floosakSenderKeyword) }
-    var hawalySender by remember(currentConfig) { mutableStateOf(currentConfig.hawalySenderKeyword) }
+    var jawaliSender by remember(currentConfig) { mutableStateOf(currentConfig.jawaliSenderKeyword) }
+    var gatewayToken by remember(currentConfig) { mutableStateOf(currentConfig.gatewayToken) }
     var newPin by remember(currentConfig) { mutableStateOf(currentConfig.adminPin) }
 
     // PIN Authentication Dialog
@@ -301,9 +302,20 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
-                    value = hawalySender,
-                    onValueChange = { hawalySender = it },
-                    label = { Text("كلمة مرسل محفظة حوالتي") },
+                    value = jawaliSender,
+                    onValueChange = { jawaliSender = it },
+                    label = { Text("كلمة مرسل محفظة جوالي") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = isUnlocked
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = gatewayToken,
+                    onValueChange = { gatewayToken = it },
+                    label = { Text("Gateway Token") },
+                    visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     enabled = isUnlocked
                 )
@@ -349,7 +361,8 @@ fun SettingsScreen(
                     retryDelaySeconds = retryDelay.toIntOrNull() ?: 15,
                     jeebSenderKeyword = jeebSender,
                     floosakSenderKeyword = floosakSender,
-                    hawalySenderKeyword = hawalySender,
+                    jawaliSenderKeyword = jawaliSender,
+                    gatewayToken = gatewayToken,
                     adminPin = newPin
                 )
                 onSaveConfig(
