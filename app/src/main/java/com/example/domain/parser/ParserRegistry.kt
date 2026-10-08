@@ -2,32 +2,24 @@ package com.example.domain.parser
 
 import com.example.domain.model.WalletType
 
-/**
- * Registry holding all available WalletParsers.
- * Easily extensible to add Wallet X or custom plugins in the future.
- */
 class ParserRegistry {
     private val parsers = mutableMapOf<WalletType, WalletParser>()
 
     init {
         register(JeebParser())
         register(FloosakParser())
-        register(HawalyParser())
+        register(JawaliParser())
     }
 
     fun register(parser: WalletParser) {
+        require(parser.walletType != WalletType.UNKNOWN) { "Unknown wallet parser is not allowed" }
         parsers[parser.walletType] = parser
     }
 
-    fun getParser(wallet: WalletType): WalletParser? {
-        return parsers[wallet]
-    }
+    fun getParser(wallet: WalletType): WalletParser? = parsers[wallet]
 
     fun findParser(sender: String, message: String, detectedWallet: WalletType): WalletParser? {
-        // Prefer detected wallet parser first
-        parsers[detectedWallet]?.let { return it }
-
-        // Fallback: check if any parser canParse
+        if (detectedWallet != WalletType.UNKNOWN) return parsers[detectedWallet]
         return parsers.values.firstOrNull { it.canParse(sender, message) }
     }
 
