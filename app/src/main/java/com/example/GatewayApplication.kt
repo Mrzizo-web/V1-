@@ -37,7 +37,7 @@ class GatewayApplication : Application() {
         walletDetector = WalletDetector()
         parserRegistry = ParserRegistry()
 
-        val posGateway = HttpPosGateway(database.gatewayConfigDao())
+        val posGateway = HttpPosGateway(database.gatewayConfigDao(), this)
 
         repository = GatewayRepository(
             smsMessageDao = database.smsMessageDao(),
