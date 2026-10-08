@@ -15,7 +15,7 @@ data class GatewayConfigEntity(
     val retryDelaySeconds: Int = 15,
     val isLoggingEnabled: Boolean = true,
     val isGatewayActive: Boolean = true,
-    val adminPin: String = "1234",
+    val adminPin: String = "",
     val jeebSenderKeyword: String = "JEEB",
     val floosakSenderKeyword: String = "FLOOSAK",
     val jawaliSenderKeyword: String = "JAWALI",
