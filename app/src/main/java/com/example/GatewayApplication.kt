@@ -56,7 +56,7 @@ class GatewayApplication : Application() {
             walletDetector.updateKeywords(
                 config.jeebSenderKeyword,
                 config.floosakSenderKeyword,
-                config.hawalySenderKeyword
+                config.jawaliSenderKeyword
             )
 
             repository.logEvent(
