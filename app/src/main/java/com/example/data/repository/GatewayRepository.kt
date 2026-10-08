@@ -25,7 +25,6 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 
 class GatewayRepository(
     private val smsMessageDao: SmsMessageDao,
@@ -40,6 +39,7 @@ class GatewayRepository(
 
     private val paymentMatcher = PaymentMatcher(paymentDao)
     private val syncMutex = Mutex()
+    private val ingestMutex = Mutex()
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
 
     private fun formatTime(millis: Long): String = timeFormat.format(Date(millis))
@@ -65,8 +65,20 @@ class GatewayRepository(
         body: String,
         receivedAt: Long = System.currentTimeMillis()
     ): ProcessSmsResult = withContext(Dispatchers.IO) {
-        val timeStr = formatTime(receivedAt)
-        logEvent("SMS_RECEIVED", "$timeStr SMS RECEIVED from $sender", level = "INFO", details = body)
+        ingestMutex.withLock {
+            // Idempotency boundary: the same source SMS must never be parsed twice.
+            val existingSms = smsMessageDao.getMessageById(smsId)
+            if (existingSms != null) {
+                return@withLock ProcessSmsResult(
+                    smsId = smsId,
+                    paymentId = existingSms.paymentId,
+                    status = PaymentStatus.DUPLICATE,
+                    message = "Duplicate SMS ignored: sourceSmsId already processed"
+                )
+            }
+
+            val timeStr = formatTime(receivedAt)
+            logEvent("SMS_RECEIVED", "$timeStr SMS RECEIVED from $sender", level = "INFO", details = body)
 
         // Detect Wallet
         val detectedWallet = walletDetector.detectWallet(sender, body)
@@ -213,7 +225,8 @@ class GatewayRepository(
         val timeStr = formatTime(System.currentTimeMillis())
         logEvent("SENDING", "$timeStr SENDING TO POS: ${payment.amount} YER (ID: ${payment.paymentId.take(8)})", level = "INFO")
 
-        val eventId = UUID.randomUUID().toString()
+        // Deterministic event ID: every retry for the same payment reuses the same id.
+        val eventId = "payment:" + payment.paymentId
         val result = posGateway.sendPayment(payment, eventId)
 
         // Record attempt
