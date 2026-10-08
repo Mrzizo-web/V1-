@@ -49,7 +49,7 @@ class HttpPosGateway(
             val deviceId = config?.deviceId ?: "GATEWAY_DEV_01"
             val ip = config?.posIpAddress ?: "192.168.1.100"
             val port = config?.posPort ?: 8080
-            val url = "http://$ip:$port/api/v1/payments/gateway-event"
+            val url = "http://$ip:$port/api/sms/ingest"
 
             val eventDto = PaymentEventDto.fromEntity(payment, deviceId, eventId)
             val jsonBody = JSONObject().apply {
@@ -74,7 +74,8 @@ class HttpPosGateway(
 
             val request = Request.Builder()
                 .url(url)
-                .header("Idempotency-Key", payment.paymentId)
+                .header("Idempotency-Key", eventId)
+                .header("X-Gateway-Event-Id", eventId)
                 .header("X-Gateway-Device-Id", deviceId)
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
