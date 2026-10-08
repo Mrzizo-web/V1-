@@ -26,6 +26,7 @@ class GatewayConfigRepository(
 
     suspend fun verifyPin(enteredPin: String): Boolean {
         val current = getCurrentConfig()
+        if (current.adminPin.isBlank()) return enteredPin.isBlank()
         return current.adminPin == enteredPin
     }
 }
