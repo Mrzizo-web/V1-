@@ -66,6 +66,11 @@ class GatewayRepository(
         receivedAt: Long = System.currentTimeMillis()
     ): ProcessSmsResult = withContext(Dispatchers.IO) {
         val timeStr = formatTime(receivedAt)
+        val existingSms = smsMessageDao.getMessageById(smsId)
+        if (existingSms != null) {
+            logEvent("SMS_DUPLICATE", "$timeStr Duplicate SMS ignored: $smsId", level = "WARN", details = body)
+            return@withContext ProcessSmsResult(smsId, existingSms.paymentId, PaymentStatus.DUPLICATE, "Duplicate SMS ignored")
+        }
         logEvent("SMS_RECEIVED", "$timeStr SMS RECEIVED from $sender", level = "INFO", details = body)
 
         // Detect Wallet
@@ -185,7 +190,7 @@ class GatewayRepository(
                 logEvent("STATUS", "$timeStr Status: ${matchOutcome.initialStatus.name}", level = "INFO")
 
                 // If queued, trigger background sync
-                if (matchOutcome.initialStatus == PaymentStatus.QUEUED) {
+                if (matchOutcome.initialStatus == PaymentStatus.QUEUED || matchOutcome.initialStatus == PaymentStatus.NEEDS_REVIEW) {
                     syncSinglePayment(payment)
                 }
 
@@ -213,7 +218,7 @@ class GatewayRepository(
         val timeStr = formatTime(System.currentTimeMillis())
         logEvent("SENDING", "$timeStr SENDING TO POS: ${payment.amount} YER (ID: ${payment.paymentId.take(8)})", level = "INFO")
 
-        val eventId = UUID.randomUUID().toString()
+        val eventId = payment.paymentId
         val result = posGateway.sendPayment(payment, eventId)
 
         // Record attempt
