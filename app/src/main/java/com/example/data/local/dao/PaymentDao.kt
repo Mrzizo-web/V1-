@@ -24,26 +24,9 @@ interface PaymentDao {
     @Query("SELECT * FROM payments WHERE paymentId = :paymentId LIMIT 1")
     suspend fun getPaymentById(paymentId: String): PaymentEntity?
 
-    @Query("SELECT * FROM payments WHERE transactionId = :txId LIMIT 1")
-    suspend fun findByTransactionId(txId: String): PaymentEntity?
+    @Query("SELECT * FROM payments WHERE wallet = :wallet AND transactionId = :txId LIMIT 1")
+    suspend fun findByTransactionId(wallet: WalletType, txId: String): PaymentEntity?
 
-    /**
-     * Find candidates within time window (e.g., 5 minutes) matching wallet, amount, and sender
-     * Used for multiple-SMS matching when transactionId is absent.
-     */
-    @Query("""
-        SELECT * FROM payments 
-        WHERE wallet = :wallet 
-        AND amount = :amount 
-        AND receivedAt BETWEEN :windowStart AND :windowEnd
-        ORDER BY receivedAt DESC
-    """)
-    suspend fun findRecentSimilar(
-        wallet: WalletType,
-        amount: Double,
-        windowStart: Long,
-        windowEnd: Long
-    ): List<PaymentEntity>
 
     /**
      * Get payments queued for sync
