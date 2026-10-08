@@ -21,5 +21,21 @@ jobs:
           java-version: "17"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+      - name: Gateway architecture guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --include='*.kt' -n 'HAWALATY\|Hawaly\|حوالتي' app/src; then
+            echo 'ERROR: legacy Hawalaty/Hawaly wallet reference found.'
+            exit 1
+          fi
+          if grep -R --include='*.kt' -n 'JEEB\|FLOOSAK\|JAWALI' app/src >/dev/null; then
+            echo 'Supported wallets detected: JEEB, FLOOSAK, JAWALI'
+          fi
+          if grep -R --include='*.kt' -n 'google-services\|FirebaseAppCheck' app/src build.gradle* settings.gradle* 2>/dev/null; then
+            echo 'ERROR: Firebase/AppCheck must not be introduced into the independent local SMS Gateway.'
+            exit 1
+          fi
+
       - name: Build and test
         run: gradle testDebugUnitTest assembleDebug
