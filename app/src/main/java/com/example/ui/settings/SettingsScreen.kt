@@ -64,7 +64,6 @@ fun SettingsScreen(
     var retryDelay by remember(currentConfig) { mutableStateOf(currentConfig.retryDelaySeconds.toString()) }
     var jeebSender by remember(currentConfig) { mutableStateOf(currentConfig.jeebSenderKeyword) }
     var floosakSender by remember(currentConfig) { mutableStateOf(currentConfig.floosakSenderKeyword) }
-    var hawalySender by remember(currentConfig) { mutableStateOf(currentConfig.hawalySenderKeyword) }
     var newPin by remember(currentConfig) { mutableStateOf(currentConfig.adminPin) }
 
     // PIN Authentication Dialog
@@ -75,7 +74,7 @@ fun SettingsScreen(
             title = { Text(text = "حماية الإعدادات برمز PIN") },
             text = {
                 Column {
-                    Text(text = "يرجى إدخال رمز مرور المدير لتعديل إعدادات الربط والشبكة الحساسة (الرمز الافتراضي: 1234):")
+                    Text(text = if (currentConfig.adminPin.isBlank()) "هذه أول مرة. أنشئ رمز PIN للمدير من 4 إلى 6 أرقام." else "يرجى إدخال رمز PIN للمدير لتعديل إعدادات الربط والشبكة الحساسة.")
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = enteredPin,
@@ -97,12 +96,17 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (enteredPin == currentConfig.adminPin) {
+                        val validFirstRunPin = currentConfig.adminPin.isBlank() &&
+                            enteredPin.matches(Regex("\\d{4,6}"))
+                        val validExistingPin = currentConfig.adminPin.isNotBlank() &&
+                            enteredPin == currentConfig.adminPin
+                        if (validFirstRunPin || validExistingPin) {
                             isUnlocked = true
                             pinDialogVisible = false
                             pinError = null
+                            if (validFirstRunPin) newPin = enteredPin
                         } else {
-                            pinError = "رمز PIN غير صحيح!"
+                            pinError = if (currentConfig.adminPin.isBlank()) "أدخل PIN من 4 إلى 6 أرقام." else "رمز PIN غير صحيح!"
                         }
                     },
                     modifier = Modifier.testTag("pin_confirm_button")
@@ -298,15 +302,6 @@ fun SettingsScreen(
                     enabled = isUnlocked
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = hawalySender,
-                    onValueChange = { hawalySender = it },
-                    label = { Text("كلمة مرسل محفظة حوالتي") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = isUnlocked
-                )
             }
         }
 
@@ -349,7 +344,6 @@ fun SettingsScreen(
                     retryDelaySeconds = retryDelay.toIntOrNull() ?: 15,
                     jeebSenderKeyword = jeebSender,
                     floosakSenderKeyword = floosakSender,
-                    hawalySenderKeyword = hawalySender,
                     adminPin = newPin
                 )
                 onSaveConfig(
