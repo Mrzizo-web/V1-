@@ -1,0 +1,6 @@
+{
+  "name": "POWER FEUL SMS GATEWAY",
+  "description": "Android SMS Gateway bridge between mobile payment wallets (Jeeb, Floosak, Hawaly) and POWER FEUL POS system",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
