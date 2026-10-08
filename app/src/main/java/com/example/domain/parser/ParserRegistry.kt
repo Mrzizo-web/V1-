@@ -12,7 +12,6 @@ class ParserRegistry {
     }
 
     fun register(parser: WalletParser) {
-        require(parser.walletType != WalletType.HAWALY) { "Unsupported wallet parser" }
         parsers[parser.walletType] = parser
     }
 
