@@ -93,9 +93,9 @@ fun SmsMessagesScreen(
             }
             item {
                 FilterChip(
-                    selected = state.selectedWalletFilter == WalletType.HAWALY,
-                    onClick = { onFilterWallet(WalletType.HAWALY) },
-                    label = { Text("حوالتي") }
+                    selected = state.selectedWalletFilter == WalletType.JAWALI,
+                    onClick = { onFilterWallet(WalletType.JAWALI) },
+                    label = { Text("جوالي") }
                 )
             }
         }
