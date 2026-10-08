@@ -66,7 +66,7 @@ fun SettingsScreen(
     var floosakSender by remember(currentConfig) { mutableStateOf(currentConfig.floosakSenderKeyword) }
     var jawaliSender by remember(currentConfig) { mutableStateOf(currentConfig.jawaliSenderKeyword) }
     var gatewayToken by remember(currentConfig) { mutableStateOf(currentConfig.gatewayToken) }
-    var newPin by remember(currentConfig) { mutableStateOf(currentConfig.adminPin) }
+    var newPin by remember(currentConfig) { mutableStateOf("") }
 
     // PIN Authentication Dialog
     if (pinDialogVisible) {
@@ -76,7 +76,7 @@ fun SettingsScreen(
             title = { Text(text = "حماية الإعدادات برمز PIN") },
             text = {
                 Column {
-                    Text(text = "يرجى إدخال رمز مرور المدير لتعديل إعدادات الربط والشبكة الحساسة (الرمز الافتراضي: 1234):")
+                    Text(text = "إذا كان هذا أول تشغيل، أنشئ رمز PIN من 4 إلى 6 أرقام. وإلا أدخل رمز PIN الحالي للمدير.")
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = enteredPin,
@@ -98,7 +98,7 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (enteredPin == currentConfig.adminPin) {
+                        if ((currentConfig.adminPin.isBlank() && enteredPin.isBlank()) || (!currentConfig.adminPin.isBlank() && enteredPin == currentConfig.adminPin)) {
                             isUnlocked = true
                             pinDialogVisible = false
                             pinError = null
@@ -351,6 +351,10 @@ fun SettingsScreen(
 
         Button(
             onClick = {
+                if (newPin.length !in 4..6 || !newPin.all { it.isDigit() }) {
+                    successNotice = "يجب أن يكون PIN الجديد من 4 إلى 6 أرقام."
+                    return@Button
+                }
                 val updated = currentConfig.copy(
                     deviceId = deviceId,
                     posIpAddress = posIp,
