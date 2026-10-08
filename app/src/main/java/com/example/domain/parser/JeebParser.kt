@@ -3,60 +3,22 @@ package com.example.domain.parser
 import com.example.domain.model.PaymentCandidate
 import com.example.domain.model.WalletType
 
-/**
- * Dedicated Parser for Jeeb wallet (جيب).
- * Isolates Jeeb-specific rules and allows updating when real sample texts arrive.
- */
-class JeebParser : BaseWalletParser(WalletType.JEEB, parserVersion = "1.0-jeeb") {
-
+class JeebParser : BaseWalletParser(WalletType.JEEB, parserVersion = "2.0-jeeb-real") {
     override val supportedSenders: List<String> = listOf("JEEB", "جيب", "KURAMI", "ALKURAMI")
 
-    override fun parse(
-        smsId: String,
-        sender: String,
-        message: String,
-        receivedAt: Long
-    ): PaymentCandidate {
-        if (isNonTransfer(message)) {
-            return PaymentCandidate(
-                wallet = walletType,
-                amount = null,
-                currency = "YER",
-                transactionId = null,
-                sender = null,
-                senderAccount = null,
-                receivedAt = receivedAt,
-                rawMessage = message,
-                confidence = 0.0f,
-                sourceSmsId = smsId,
-                parserVersion = parserVersion,
-                isFinancialTransfer = false
-            )
+    private val incoming = Regex("""^اضيف\s+(\d+(?:\.\d+)?)\s+ر\.ي\s+(.+?)\s+رص:(\d+(?:\.\d+)?)ر\.ي\s+من\s+(.+?)-(\d+)$""")
+    private val outgoing = Regex("""^خصم\s+(\d+(?:\.\d+)?)\s+ر\.ي\s+(.+?)\s+رص:(\d+(?:\.\d+)?)ر\.ي\s+الى\s+(\d+)\s+(.+)$""")
+
+    override fun parse(smsId: String, sender: String, message: String, receivedAt: Long): PaymentCandidate {
+        val text = normalizeDigits(message.trim())
+        incoming.matchEntire(text)?.let { m ->
+            val amount = m.groupValues[1].toDoubleOrNull()
+            if (amount != null && amount > 0) return PaymentCandidate(WalletType.JEEB, amount, "YER", null, m.groupValues[4].trim(), m.groupValues[5].trim(), receivedAt, message, 0.95f, smsId, parserVersion, true)
         }
-
-        val amount = extractAmount(message)
-        val transactionId = extractTransactionId(message)
-        val senderParty = extractSenderParty(message)
-
-        // Confidence scoring:
-        // Having both amount & transactionId gives high confidence
-        var confidence = 0.5f
-        if (amount != null && amount > 0) confidence += 0.3f
-        if (transactionId != null) confidence += 0.2f
-
-        return PaymentCandidate(
-            wallet = walletType,
-            amount = amount,
-            currency = "YER",
-            transactionId = transactionId,
-            sender = senderParty,
-            senderAccount = null,
-            receivedAt = receivedAt,
-            rawMessage = message,
-            confidence = confidence.coerceIn(0.0f, 1.0f),
-            sourceSmsId = smsId,
-            parserVersion = parserVersion,
-            isFinancialTransfer = amount != null && amount > 0
-        )
+        outgoing.matchEntire(text)?.let { m ->
+            val amount = m.groupValues[1].toDoubleOrNull()
+            if (amount != null && amount > 0) return PaymentCandidate(WalletType.JEEB, amount, "YER", null, m.groupValues[5].trim(), m.groupValues[4].trim(), receivedAt, message, 0.95f, smsId, parserVersion, false)
+        }
+        return PaymentCandidate(WalletType.JEEB, null, "YER", null, null, null, receivedAt, message, 0f, smsId, parserVersion, false)
     }
 }
