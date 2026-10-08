@@ -63,7 +63,6 @@ class HttpPosGateway(
                 put("amount", eventDto.amount)
                 put("currency", eventDto.currency)
                 put("transactionId", eventDto.transactionId ?: JSONObject.NULL)
-                put("sender", eventDto.sender ?: JSONObject.NULL)
                 put("senderAccount", eventDto.senderAccount ?: JSONObject.NULL)
                 put("receivedAt", eventDto.receivedAt)
                 put("gatewayDeviceId", eventDto.gatewayDeviceId)
