@@ -70,61 +70,11 @@ class PaymentMatcher(
             )
         }
 
-        // 3. Heuristic matching within the time window
-        val windowStart = candidate.receivedAt - timeWindowMillis
-        val windowEnd = candidate.receivedAt + timeWindowMillis
-
-        val similarPayments = paymentDao.findRecentSimilar(
-            wallet = candidate.wallet,
-            amount = candidate.amount,
-            windowStart = windowStart,
-            windowEnd = windowEnd
-        )
-
-        if (similarPayments.isNotEmpty()) {
-            // Check if there is an exact sender match without a transaction ID
-            val matchingSender = similarPayments.firstOrNull { existing ->
-                existing.transactionId == null &&
-                        !existing.sender.isNullOrBlank() &&
-                        !candidate.sender.isNullOrBlank() &&
-                        existing.sender.equals(candidate.sender, ignoreCase = true)
-            }
-
-            if (matchingSender != null) {
-                return MatchOutcome.LinkToExisting(
-                    existingPayment = matchingSender,
-                    reason = "Heuristic match: same wallet, amount, and sender within 5-min window"
-                )
-            }
-
-            // If similar payments exist but senders differ or are absent, DO NOT blindly merge!
-            // Flag as NEEDS_REVIEW so operator or POS can verify rather than falsifying payments.
-            val paymentId = UUID.randomUUID().toString()
-            val payment = PaymentEntity(
-                paymentId = paymentId,
-                transactionId = candidate.transactionId,
-                wallet = candidate.wallet,
-                amount = candidate.amount,
-                currency = candidate.currency,
-                sender = candidate.sender,
-                senderAccount = candidate.senderAccount,
-                receivedAt = candidate.receivedAt,
-                messageCount = 1,
-                confidence = (candidate.confidence * 0.7f).coerceIn(0.0f, 1.0f),
-                status = PaymentStatus.NEEDS_REVIEW,
-                parserVersion = candidate.parserVersion,
-                rawMessageSnippet = candidate.rawMessage.take(150),
-                initialSmsId = candidate.sourceSmsId,
-                createdAt = now,
-                updatedAt = now,
-                syncErrorMessage = "Ambiguous: another transaction with same amount was received recently"
-            )
-            return MatchOutcome.CreateNew(
-                newPayment = payment,
-                initialStatus = PaymentStatus.NEEDS_REVIEW,
-                reason = "Multiple candidate payments with same amount within time window"
-            )
-        }
+        // 3. No heuristic correlation when transaction ID is absent.
+        // A payment without a transaction/reference ID must never be merged
+        // using amount + sender + time. Each SMS remains an independent payment.
+        // This prevents two legitimate transfers with identical values from
+        // being silently combined.
 
         // 4. Clean New Payment
         val initialStatus = if (candidate.confidence >= 0.6f) {
