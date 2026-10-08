@@ -5,12 +5,11 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "gateway_config")
 data class GatewayConfigEntity(
-    @PrimaryKey
-    val id: Int = 1,
+    @PrimaryKey val id: Int = 1,
     val deviceId: String = "GATEWAY_DEV_01",
-    val posIpAddress: String = "192.168.1.100",
+    val posIpAddress: String = "",
     val posPort: Int = 8080,
-    val connectionMode: String = "WIFI_LAN", // "WIFI_LAN" or "HTTP_DIRECT"
+    val connectionMode: String = "WIFI_LAN",
     val isAutoSyncEnabled: Boolean = true,
     val maxRetryCount: Int = 5,
     val retryDelaySeconds: Int = 15,
@@ -19,5 +18,7 @@ data class GatewayConfigEntity(
     val adminPin: String = "1234",
     val jeebSenderKeyword: String = "JEEB",
     val floosakSenderKeyword: String = "FLOOSAK",
-    val hawalySenderKeyword: String = "HAWALY"
+    val jawaliSenderKeyword: String = "JAWALI",
+    // Kept only for database backward compatibility; it is never detected or parsed.
+    val hawalySenderKeyword: String = "DISABLED"
 )
