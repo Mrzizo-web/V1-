@@ -2,11 +2,14 @@ package com.example.data.repository
 
 import com.example.data.local.dao.GatewayConfigDao
 import com.example.data.local.entity.GatewayConfigEntity
+import android.content.Context
+import com.example.security.GatewaySecretStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class GatewayConfigRepository(
-    private val configDao: GatewayConfigDao
+    private val configDao: GatewayConfigDao,
+    private val context: Context
 ) {
     val configFlow: Flow<GatewayConfigEntity> = configDao.observeConfig().map { it ?: GatewayConfigEntity() }
 
@@ -17,7 +20,9 @@ class GatewayConfigRepository(
     }
 
     suspend fun updateConfig(updated: GatewayConfigEntity) {
-        configDao.insertOrUpdate(updated)
+        val current = getCurrentConfig()
+        val tokenToStore = if (updated.gatewayToken.isBlank()) current.gatewayToken else GatewaySecretStore.encrypt(context, updated.gatewayToken)
+        configDao.insertOrUpdate(updated.copy(gatewayToken = tokenToStore))
     }
 
     suspend fun setGatewayActive(active: Boolean) {
