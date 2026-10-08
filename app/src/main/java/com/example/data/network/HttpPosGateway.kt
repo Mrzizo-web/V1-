@@ -27,7 +27,7 @@ class HttpPosGateway(
 
     override suspend fun checkConnection(): Boolean = withContext(Dispatchers.IO) {
         val config = configDao.getConfig() ?: return@withContext false
-        val url = "http://${config.posIpAddress}:${config.posPort}/api/v1/health"
+        val url = "http://${config.posIpAddress}:${config.posPort}/api/status"
 
         return@withContext try {
             val request = Request.Builder()
