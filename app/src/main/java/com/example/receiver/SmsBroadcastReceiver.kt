@@ -10,7 +10,7 @@ import com.example.GatewayApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.UUID
+import java.security.MessageDigest
 
 class SmsBroadcastReceiver : BroadcastReceiver() {
 
@@ -47,7 +47,7 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                         bodyBuilder.append(sms.displayMessageBody ?: "")
                     }
                     val fullBody = bodyBuilder.toString().trim()
-                    val smsId = UUID.randomUUID().toString()
+                    val smsId = stableSmsId(sender, timestamp, fullBody)
 
                     app.repository.processIncomingSms(
                         smsId = smsId,
@@ -62,5 +62,11 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 pendingResult.finish()
             }
         }
+    }
+
+    private fun stableSmsId(sender: String, receivedAt: Long, body: String): String {
+        val input = "$sender|$receivedAt|$body".toByteArray(Charsets.UTF_8)
+        val digest = MessageDigest.getInstance("SHA-256").digest(input)
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }
