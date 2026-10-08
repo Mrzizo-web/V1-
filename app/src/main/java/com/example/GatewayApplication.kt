@@ -55,8 +55,7 @@ class GatewayApplication : Application() {
             val config = configRepository.getCurrentConfig()
             walletDetector.updateKeywords(
                 config.jeebSenderKeyword,
-                config.floosakSenderKeyword,
-                config.hawalySenderKeyword
+                config.floosakSenderKeyword
             )
 
             repository.logEvent(
