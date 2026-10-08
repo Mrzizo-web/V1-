@@ -49,10 +49,14 @@ class HttpPosGateway(
             val deviceId = config?.deviceId ?: "GATEWAY_DEV_01"
             val ip = config?.posIpAddress ?: "192.168.1.100"
             val port = config?.posPort ?: 8080
-            val url = "http://$ip:$port/api/v1/payments/gateway-event"
+            val url = "http://$ip:$port/api/sms/ingest"
 
             val eventDto = PaymentEventDto.fromEntity(payment, deviceId, eventId)
             val jsonBody = JSONObject().apply {
+                // POS currently accepts the canonical SMS ingestion endpoint.
+                // Metadata headers remain available for the hardened POS endpoint.
+                put("sender", eventDto.sender ?: "")
+                put("body", eventDto.rawMessage)
                 put("eventId", eventDto.eventId)
                 put("paymentId", eventDto.paymentId)
                 put("wallet", eventDto.wallet)
