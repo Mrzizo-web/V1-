@@ -32,7 +32,8 @@ class GatewayConfigRepository(
 
     suspend fun verifyPin(enteredPin: String): Boolean {
         val current = getCurrentConfig()
-        if (current.adminPin.isBlank()) return false
+        // First run has no credential yet; the settings UI validates the new PIN.
+        if (current.adminPin.isBlank()) return true
         return enteredPin.length in 4..6 && enteredPin.all(Char::isDigit) && current.adminPin == enteredPin
     }
 }
