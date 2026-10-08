@@ -29,6 +29,14 @@ jobs:
             echo 'ERROR: legacy Hawalaty/Hawaly wallet reference found.'
             exit 1
           fi
+          if grep -R --include='*.kt' -n 'findRecentSimilar\|timeWindowMillis\|same wallet, amount, and sender' app/src; then
+            echo 'ERROR: heuristic financial duplicate matching is forbidden.'
+            exit 1
+          fi
+          if grep -R --include='*.kt' -n 'adminPin: String = "1234"\|الرمز الافتراضي: 1234' app/src; then
+            echo 'ERROR: insecure default admin PIN found.'
+            exit 1
+          fi
           if grep -R --include='*.kt' -n 'JEEB\|FLOOSAK\|JAWALI' app/src >/dev/null; then
             echo 'Supported wallets detected: JEEB, FLOOSAK, JAWALI'
           fi
