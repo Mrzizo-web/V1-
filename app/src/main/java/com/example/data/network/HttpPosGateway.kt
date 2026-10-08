@@ -77,6 +77,9 @@ class HttpPosGateway(
                 .header("Idempotency-Key", payment.paymentId)
                 .header("X-Gateway-Device-Id", deviceId)
                 .header("X-Gateway-Event-Id", eventId)
+                .apply {
+                    config?.gatewayToken?.takeIf { it.isNotBlank() }?.let { header("X-Gateway-Token", it) }
+                }
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
 
