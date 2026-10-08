@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.TypeConverters
 import com.example.data.local.dao.EventLogDao
 import com.example.data.local.dao.GatewayConfigDao
@@ -24,11 +26,18 @@ import com.example.data.local.entity.SmsMessageEntity
         GatewayConfigEntity::class,
         EventLogEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
+
+    companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE gateway_config ADD COLUMN jawaliSenderKeyword TEXT NOT NULL DEFAULT 'JAWALI'")
+            }
+        }
 
     abstract fun smsMessageDao(): SmsMessageDao
     abstract fun paymentDao(): PaymentDao
@@ -36,7 +45,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun gatewayConfigDao(): GatewayConfigDao
     abstract fun eventLogDao(): EventLogDao
 
-    companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -47,7 +55,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "power_fuel_sms_gateway.db"
                 )
-                    .fallbackToDestructiveMigration(false)
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                     .also { INSTANCE = it }
             }
