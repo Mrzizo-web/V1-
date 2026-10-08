@@ -19,6 +19,7 @@ data class GatewayConfigEntity(
     val jeebSenderKeyword: String = "JEEB",
     val floosakSenderKeyword: String = "FLOOSAK",
     val jawaliSenderKeyword: String = "JAWALI",
+    val gatewayToken: String = "",
     // Kept only for database backward compatibility; it is never detected or parsed.
     val hawalySenderKeyword: String = "DISABLED"
 )
