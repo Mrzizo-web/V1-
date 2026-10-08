@@ -29,8 +29,8 @@ interface SmsMessageDao {
     @Query("SELECT * FROM sms_messages WHERE parsedTransactionId = :txId LIMIT 1")
     suspend fun findByTransactionId(txId: String): SmsMessageEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMessage(message: SmsMessageEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMessage(message: SmsMessageEntity): Long
 
     @Update
     suspend fun updateMessage(message: SmsMessageEntity)
