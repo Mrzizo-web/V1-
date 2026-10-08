@@ -76,6 +76,7 @@ class HttpPosGateway(
                 .url(url)
                 .header("Idempotency-Key", payment.paymentId)
                 .header("X-Gateway-Device-Id", deviceId)
+                .header("X-Gateway-Event-Id", eventId)
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
 
