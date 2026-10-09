@@ -4,6 +4,7 @@ import com.example.data.local.dao.GatewayConfigDao
 import com.example.data.local.entity.PaymentEntity
 import com.example.data.network.model.PaymentEventDto
 import com.example.data.network.model.PosAckResponse
+import com.example.data.security.SecureTokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,6 +17,7 @@ import java.util.concurrent.TimeUnit
 
 class HttpPosGateway(
     private val configDao: GatewayConfigDao,
+    private val secureTokenStore: SecureTokenStore,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
@@ -46,6 +48,12 @@ class HttpPosGateway(
     override suspend fun sendPayment(payment: PaymentEntity, eventId: String): PosAckResponse =
         withContext(Dispatchers.IO) {
             val config = configDao.getConfig()
+            val token = secureTokenStore.getToken()
+                ?: return@withContext PosAckResponse(
+                    isSuccess = false,
+                    httpStatusCode = null,
+                    errorMessage = "Gateway token is not configured. Configure the shared token in Settings."
+                )
             val deviceId = config?.deviceId ?: "GATEWAY_DEV_01"
             val ip = config?.posIpAddress ?: "192.168.1.100"
             val port = config?.posPort ?: 8080
@@ -77,6 +85,7 @@ class HttpPosGateway(
                 .header("Idempotency-Key", eventId)
                 .header("X-Gateway-Event-Id", eventId)
                 .header("X-Gateway-Device-Id", deviceId)
+                .header("X-Gateway-Token", token)
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
 
