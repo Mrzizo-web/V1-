@@ -86,14 +86,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Theme {
-                GatewayMainScreen(viewModel = viewModel)
+                GatewayMainScreen(viewModel = viewModel, tokenAlreadyConfigured = app.configRepository.hasGatewayToken())
             }
         }
     }
 }
 
 @Composable
-fun GatewayMainScreen(viewModel: MainViewModel) {
+fun GatewayMainScreen(viewModel: MainViewModel, tokenAlreadyConfigured: Boolean = false) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
