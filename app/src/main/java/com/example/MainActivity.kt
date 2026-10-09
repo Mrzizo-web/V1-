@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
 fun GatewayMainScreen(viewModel: MainViewModel, tokenAlreadyConfigured: Boolean = false) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var tokenConfigured by remember { mutableStateOf(tokenAlreadyConfigured) }
     var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
     var isSimulatorOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -267,8 +268,8 @@ fun GatewayMainScreen(viewModel: MainViewModel, tokenAlreadyConfigured: Boolean 
 
                 AppTab.SETTINGS -> SettingsScreen(
                     currentConfig = uiState.config,
-                    tokenAlreadyConfigured = tokenAlreadyConfigured,
-                    onSaveToken = { value -> viewModel.saveGatewayToken(value) },
+                    tokenAlreadyConfigured = tokenConfigured,
+                    onSaveToken = { value -> viewModel.saveGatewayToken(value); tokenConfigured = true },
                     onSaveConfig = { updated, pin, onSuccess, onError ->
                         viewModel.updateConfig(updated, pin, onSuccess, onError)
                     }
