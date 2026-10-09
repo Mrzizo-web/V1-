@@ -131,6 +131,17 @@ class MainViewModel(
         }
     }
 
+    fun saveGatewayToken(value: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                configRepository.saveGatewayToken(value)
+                _uiState.update { it.copy(userFeedbackMessage = "تم حفظ إعداد الربط") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(userFeedbackMessage = "تعذر حفظ إعداد الربط. تحقق من طول القيمة المدخلة.") }
+            }
+        }
+    }
+
     fun setWalletFilter(wallet: WalletType) {
         _uiState.update { it.copy(selectedWalletFilter = wallet) }
     }
