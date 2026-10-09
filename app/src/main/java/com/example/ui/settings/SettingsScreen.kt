@@ -36,16 +36,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.GatewayConfigEntity
+import java.security.SecureRandom
 
 @Composable
 fun SettingsScreen(
     currentConfig: GatewayConfigEntity,
+    tokenAlreadyConfigured: Boolean = false,
+    onSaveToken: (String) -> Unit = {},
     onSaveConfig: (GatewayConfigEntity, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit
 ) {
     var isUnlocked by remember { mutableStateOf(false) }
@@ -53,6 +58,9 @@ fun SettingsScreen(
     var enteredPin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
     var successNotice by remember { mutableStateOf<String?>(null) }
+    var gatewayToken by remember { mutableStateOf("") }
+    var tokenConfigured by remember(tokenAlreadyConfigured) { mutableStateOf(tokenAlreadyConfigured) }
+    val clipboardManager = LocalClipboardManager.current
 
     // Form states
     var deviceId by remember(currentConfig) { mutableStateOf(currentConfig.deviceId) }
@@ -305,6 +313,56 @@ fun SettingsScreen(
             }
         }
 
+        // Shared authentication token is stored encrypted outside Room.
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("توكن الربط الآمن مع POWER FEUL POS", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    if (tokenConfigured) "يوجد توكن محفوظ ومشفّر على هذا الهاتف. إدخال توكن جديد يستبدله."
+                    else "لم يتم إعداد التوكن بعد. أنشئ توكنًا ثم انسخه وأدخله في إعدادات POS.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = gatewayToken,
+                    onValueChange = { gatewayToken = it },
+                    label = { Text("Gateway Token (32 حرفًا على الأقل)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = isUnlocked
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        enabled = isUnlocked,
+                        onClick = {
+                            val bytes = ByteArray(32)
+                            SecureRandom().nextBytes(bytes)
+                            gatewayToken = bytes.joinToString("") { "%02x".format(it) }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("توليد توكن قوي") }
+                    OutlinedButton(
+                        enabled = isUnlocked && gatewayToken.length >= 32,
+                        onClick = { clipboardManager.setText(AnnotatedString(gatewayToken)) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("نسخ التوكن") }
+                }
+                Text(
+                    "احتفظ بالتوكن بسرية. لا ترسله عبر محادثات عامة. بعد نسخه، أدخله في إعدادات تطبيق POS.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         // Security PIN Change Card
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -350,6 +408,11 @@ fun SettingsScreen(
                     updated,
                     enteredPin,
                     {
+                        if (gatewayToken.isNotBlank()) {
+                            onSaveToken(gatewayToken.trim())
+                            gatewayToken = ""
+                            tokenConfigured = true
+                        }
                         successNotice = "تم حفظ الإعدادات بنجاح"
                     },
                     { errorMsg ->
