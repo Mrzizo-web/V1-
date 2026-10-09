@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.data.local.AppDatabase
 import com.example.data.network.HttpPosGateway
 import com.example.data.repository.GatewayConfigRepository
+import com.example.data.security.SecureTokenStore
 import com.example.data.repository.GatewayRepository
 import com.example.domain.parser.ParserRegistry
 import com.example.domain.parser.WalletDetector
@@ -33,11 +34,12 @@ class GatewayApplication : Application() {
         super.onCreate()
 
         database = AppDatabase.getInstance(this)
-        configRepository = GatewayConfigRepository(database.gatewayConfigDao())
+        val secureTokenStore = SecureTokenStore(this)
+        configRepository = GatewayConfigRepository(database.gatewayConfigDao(), secureTokenStore)
         walletDetector = WalletDetector()
         parserRegistry = ParserRegistry()
 
-        val posGateway = HttpPosGateway(database.gatewayConfigDao())
+        val posGateway = HttpPosGateway(database.gatewayConfigDao(), secureTokenStore)
 
         repository = GatewayRepository(
             smsMessageDao = database.smsMessageDao(),
