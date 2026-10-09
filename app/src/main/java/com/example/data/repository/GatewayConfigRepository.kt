@@ -2,11 +2,13 @@ package com.example.data.repository
 
 import com.example.data.local.dao.GatewayConfigDao
 import com.example.data.local.entity.GatewayConfigEntity
+import com.example.data.security.SecureTokenStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class GatewayConfigRepository(
-    private val configDao: GatewayConfigDao
+    private val configDao: GatewayConfigDao,
+    private val secureTokenStore: SecureTokenStore
 ) {
     val configFlow: Flow<GatewayConfigEntity> = configDao.observeConfig().map { it ?: GatewayConfigEntity() }
 
@@ -26,13 +28,22 @@ class GatewayConfigRepository(
         configDao.insertOrUpdate(updated)
     }
 
+    fun saveGatewayToken(token: String) = secureTokenStore.saveToken(token)
+
+    fun getGatewayToken(): String? = secureTokenStore.getToken()
+
+    fun hasGatewayToken(): Boolean = secureTokenStore.getToken() != null
+
+    fun generateGatewayToken(): String = secureTokenStore.generateToken()
+
+    fun clearGatewayToken() = secureTokenStore.clearToken()
+
     suspend fun setGatewayActive(active: Boolean) {
         configDao.setGatewayActive(active)
     }
 
     suspend fun verifyPin(enteredPin: String): Boolean {
         val current = getCurrentConfig()
-        // First run has no credential yet; the settings UI validates the new PIN.
         if (current.adminPin.isBlank()) return true
         return enteredPin.length in 4..6 && enteredPin.all(Char::isDigit) && current.adminPin == enteredPin
     }
