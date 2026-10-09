@@ -267,6 +267,8 @@ fun GatewayMainScreen(viewModel: MainViewModel, tokenAlreadyConfigured: Boolean 
 
                 AppTab.SETTINGS -> SettingsScreen(
                     currentConfig = uiState.config,
+                    tokenAlreadyConfigured = tokenAlreadyConfigured,
+                    onSaveToken = { value -> viewModel.saveGatewayToken(value) },
                     onSaveConfig = { updated, pin, onSuccess, onError ->
                         viewModel.updateConfig(updated, pin, onSuccess, onError)
                     }
