@@ -72,7 +72,7 @@ fun SettingsScreen(
     var retryDelay by remember(currentConfig) { mutableStateOf(currentConfig.retryDelaySeconds.toString()) }
     var jeebSender by remember(currentConfig) { mutableStateOf(currentConfig.jeebSenderKeyword) }
     var floosakSender by remember(currentConfig) { mutableStateOf(currentConfig.floosakSenderKeyword) }
-    var newPin by remember(currentConfig) { mutableStateOf(currentConfig.adminPin) }
+    var newPin by remember(currentConfig) { mutableStateOf("") }
 
     // PIN Authentication Dialog
     if (pinDialogVisible) {
@@ -381,7 +381,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = newPin,
                     onValueChange = { newPin = it },
-                    label = { Text("رمز PIN الجديد") },
+                    label = { Text("رمز PIN الجديد (اتركه فارغًا للإبقاء على الحالي)") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.fillMaxWidth(),
