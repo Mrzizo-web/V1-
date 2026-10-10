@@ -270,6 +270,7 @@ fun GatewayMainScreen(viewModel: MainViewModel, tokenAlreadyConfigured: Boolean 
                     currentConfig = uiState.config,
                     tokenAlreadyConfigured = tokenConfigured,
                     onSaveToken = { value -> viewModel.saveGatewayToken(value); tokenConfigured = true },
+                    onVerifyPin = { pin, result -> viewModel.verifyAdminPin(pin, result) },
                     onSaveConfig = { updated, pin, onSuccess, onError ->
                         viewModel.updateConfig(updated, pin, onSuccess, onError)
                     }
