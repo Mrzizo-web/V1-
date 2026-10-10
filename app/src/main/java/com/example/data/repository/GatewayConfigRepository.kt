@@ -63,7 +63,7 @@ class GatewayConfigRepository(
         return false
     }
 
-    private fun isHashedPin(value: String): Boolean = value.startsWith(PIN_PREFIX)
+    private fun isHashedPin(value: String): Boolean = value.startsWith(PIN_PREFIX + SEPARATOR)
 
     private fun hashPin(pin: String): String {
         val salt = ByteArray(SALT_BYTES).also { SecureRandom().nextBytes(it) }
@@ -76,7 +76,7 @@ class GatewayConfigRepository(
     private fun verifyHashedPin(pin: String, encoded: String): Boolean {
         return try {
             val parts = encoded.split(SEPARATOR)
-            if (parts.size != 4 || parts[0] != PIN_PREFIX.removeSuffix(SEPARATOR)) return false
+            if (parts.size != 4 || parts[0] != PIN_PREFIX) return false
             val iterations = parts[1].toInt()
             if (iterations !in MIN_ITERATIONS..MAX_ITERATIONS) return false
             val salt = Base64.decode(parts[2], Base64.NO_WRAP)
@@ -99,7 +99,7 @@ class GatewayConfigRepository(
 
     companion object {
         private const val PIN_PREFIX = "pbkdf2-sha256"
-        private const val SEPARATOR = "$"
+        private const val SEPARATOR = "\\$"
         private const val ITERATIONS = 120_000
         private const val MIN_ITERATIONS = 100_000
         private const val MAX_ITERATIONS = 500_000
