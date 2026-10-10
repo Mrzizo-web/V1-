@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.data.local.entity.PaymentEntity
 import com.example.domain.model.PaymentStatus
+import com.example.domain.model.WalletType
 import kotlinx.coroutines.flow.Flow
 
 @Dao
