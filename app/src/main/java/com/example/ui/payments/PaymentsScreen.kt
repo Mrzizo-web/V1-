@@ -66,7 +66,7 @@ fun PaymentsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Wallet Filter Chips: [ الكل ] [ جيب ] [ فلوسك ] [ حوالتي ]
+        // Wallet Filter Chips: all supported wallets
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -94,9 +94,9 @@ fun PaymentsScreen(
             }
             item {
                 FilterChip(
-                    selected = state.selectedWalletFilter == WalletType.HAWALY,
-                    onClick = { onFilterWallet(WalletType.HAWALY) },
-                    label = { Text("حوالتي") }
+                    selected = state.selectedWalletFilter == WalletType.JAWALI,
+                    onClick = { onFilterWallet(WalletType.JAWALI) },
+                    label = { Text("جوالي") }
                 )
             }
         }
