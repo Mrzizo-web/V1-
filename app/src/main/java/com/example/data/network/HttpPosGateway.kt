@@ -5,6 +5,7 @@ import com.example.data.local.entity.PaymentEntity
 import com.example.data.network.model.PaymentEventDto
 import com.example.data.network.model.PosAckResponse
 import com.example.data.security.SecureTokenStore
+import com.example.data.network.GatewayRequestSigner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -80,12 +81,21 @@ class HttpPosGateway(
                 put("status", eventDto.status)
             }.toString()
 
+            val timestamp = System.currentTimeMillis().toString()
+            val signature = GatewayRequestSigner.sign(
+                token = token,
+                timestamp = timestamp,
+                eventId = eventId,
+                deviceId = deviceId,
+                body = jsonBody
+            )
             val request = Request.Builder()
                 .url(url)
                 .header("Idempotency-Key", eventId)
-                .header("X-Gateway-Event-Id", eventId)
-                .header("X-Gateway-Device-Id", deviceId)
-                .header("X-Gateway-Token", token)
+                .header(GatewayRequestSigner.EVENT_ID_HEADER, eventId)
+                .header(GatewayRequestSigner.DEVICE_ID_HEADER, deviceId)
+                .header(GatewayRequestSigner.TIMESTAMP_HEADER, timestamp)
+                .header(GatewayRequestSigner.SIGNATURE_HEADER, signature)
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
 
