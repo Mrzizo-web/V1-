@@ -51,6 +51,7 @@ fun SettingsScreen(
     currentConfig: GatewayConfigEntity,
     tokenAlreadyConfigured: Boolean = false,
     onSaveToken: (String) -> Unit = {},
+    onVerifyPin: (String, (Boolean) -> Unit) -> Unit = { _, result -> result(false) },
     onSaveConfig: (GatewayConfigEntity, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit
 ) {
     var isUnlocked by remember { mutableStateOf(false) }
@@ -106,15 +107,23 @@ fun SettingsScreen(
                     onClick = {
                         val validFirstRunPin = currentConfig.adminPin.isBlank() &&
                             enteredPin.matches(Regex("\\d{4,6}"))
-                        val validExistingPin = currentConfig.adminPin.isNotBlank() &&
-                            enteredPin.matches(Regex("\\d{4,6}"))
-                        if (validFirstRunPin || validExistingPin) {
+                        if (validFirstRunPin) {
                             isUnlocked = true
                             pinDialogVisible = false
                             pinError = null
-                            if (validFirstRunPin) newPin = enteredPin
+                            newPin = enteredPin
+                        } else if (currentConfig.adminPin.isNotBlank()) {
+                            onVerifyPin(enteredPin) { valid ->
+                                if (valid) {
+                                    isUnlocked = true
+                                    pinDialogVisible = false
+                                    pinError = null
+                                } else {
+                                    pinError = "رمز PIN غير صحيح!"
+                                }
+                            }
                         } else {
-                            pinError = if (currentConfig.adminPin.isBlank()) "أدخل PIN من 4 إلى 6 أرقام." else "رمز PIN غير صحيح!"
+                            pinError = "أدخل PIN من 4 إلى 6 أرقام."
                         }
                     },
                     modifier = Modifier.testTag("pin_confirm_button")
