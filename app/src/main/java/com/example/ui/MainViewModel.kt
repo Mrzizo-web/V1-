@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.UUID
 
@@ -242,6 +243,13 @@ class MainViewModel(
                     userFeedbackMessage = "تمت محاكاة وصول SMS: ${result.message}"
                 )
             }
+        }
+    }
+
+    fun verifyAdminPin(pin: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val valid = withContext(Dispatchers.IO) { configRepository.verifyPin(pin) }
+            onResult(valid)
         }
     }
 
