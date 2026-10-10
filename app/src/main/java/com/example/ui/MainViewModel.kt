@@ -247,9 +247,14 @@ class MainViewModel(
 
     fun updateConfig(newConfig: GatewayConfigEntity, enteredPin: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val valid = configRepository.verifyPin(enteredPin)
+            val currentConfig = configRepository.getCurrentConfig()
+            val valid = if (currentConfig.adminPin.isBlank()) {
+                enteredPin.matches(Regex("\\d{4,6}")) && enteredPin == newConfig.adminPin
+            } else {
+                configRepository.verifyPin(enteredPin)
+            }
             if (!valid) {
-                onError("رمز PIN غير صحيح!")
+                onError("رمز PIN غير صحيح أو لم يتم إعداد رمز المدير.")
                 return@launch
             }
             configRepository.updateConfig(newConfig)
