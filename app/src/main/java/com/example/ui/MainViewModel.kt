@@ -265,9 +265,15 @@ class MainViewModel(
                 onError("رمز PIN غير صحيح أو لم يتم إعداد رمز المدير.")
                 return@launch
             }
-            configRepository.updateConfig(newConfig)
-            repository.logEvent("CONFIG_UPDATED", "تم تحديث إعدادات Gateway بنجاح", level = "INFO")
-            onSuccess()
+            try {
+                configRepository.updateConfig(newConfig)
+                repository.logEvent("CONFIG_UPDATED", "تم تحديث إعدادات Gateway بنجاح", level = "INFO")
+                onSuccess()
+            } catch (e: IllegalArgumentException) {
+                onError(e.message ?: "تحقق من رمز PIN الجديد.")
+            } catch (_: Exception) {
+                onError("تعذر حفظ الإعدادات. تحقق من القيم وحاول مجددًا.")
+            }
         }
     }
 }
