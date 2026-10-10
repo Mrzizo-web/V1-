@@ -107,7 +107,7 @@ fun SettingsScreen(
                         val validFirstRunPin = currentConfig.adminPin.isBlank() &&
                             enteredPin.matches(Regex("\\d{4,6}"))
                         val validExistingPin = currentConfig.adminPin.isNotBlank() &&
-                            enteredPin == currentConfig.adminPin
+                            enteredPin.matches(Regex("\\d{4,6}"))
                         if (validFirstRunPin || validExistingPin) {
                             isUnlocked = true
                             pinDialogVisible = false
@@ -402,7 +402,7 @@ fun SettingsScreen(
                     retryDelaySeconds = retryDelay.toIntOrNull() ?: 15,
                     jeebSenderKeyword = jeebSender,
                     floosakSenderKeyword = floosakSender,
-                    adminPin = newPin
+                    adminPin = newPin.ifBlank { currentConfig.adminPin }
                 )
                 onSaveConfig(
                     updated,
