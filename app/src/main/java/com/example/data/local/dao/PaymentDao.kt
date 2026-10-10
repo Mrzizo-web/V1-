@@ -7,7 +7,6 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.data.local.entity.PaymentEntity
 import com.example.domain.model.PaymentStatus
-import com.example.domain.model.WalletType
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -26,24 +25,6 @@ interface PaymentDao {
 
     @Query("SELECT * FROM payments WHERE transactionId = :txId LIMIT 1")
     suspend fun findByTransactionId(txId: String): PaymentEntity?
-
-    /**
-     * Find candidates within time window (e.g., 5 minutes) matching wallet, amount, and sender
-     * Used for multiple-SMS matching when transactionId is absent.
-     */
-    @Query("""
-        SELECT * FROM payments 
-        WHERE wallet = :wallet 
-        AND amount = :amount 
-        AND receivedAt BETWEEN :windowStart AND :windowEnd
-        ORDER BY receivedAt DESC
-    """)
-    suspend fun findRecentSimilar(
-        wallet: WalletType,
-        amount: Double,
-        windowStart: Long,
-        windowEnd: Long
-    ): List<PaymentEntity>
 
     /**
      * Get payments queued for sync
