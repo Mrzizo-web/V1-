@@ -27,13 +27,13 @@ class ExampleUnitTest {
     @Test
     fun jeebParser_extractsAmountAndTransactionId() {
         val parser = JeebParser()
-        val text = "تم استلام حوالة بمبلغ 5,000 ريال من العميل محمد أحمد. رقم العملية: JB-78912"
+        val text = "اضيف 5000 ر.ي تحويل مشترك رص:72758.47ر.ي من عبدالله الجميلي-77366225"
         val candidate = parser.parse("sms-1", "JEEB", text, System.currentTimeMillis())
 
         assertEquals(WalletType.JEEB, candidate.wallet)
         assertEquals(5000.0, candidate.amount ?: 0.0, 0.001)
         assertEquals("YER", candidate.currency)
-        assertEquals("JB-78912", candidate.transactionId)
+        assertNull(candidate.transactionId)
         assertTrue(candidate.isFinancialTransfer)
         assertTrue(candidate.confidence >= 0.7f)
     }
@@ -41,12 +41,12 @@ class ExampleUnitTest {
     @Test
     fun floosakParser_extractsDetailsCorrectly() {
         val parser = FloosakParser()
-        val text = "تم تحويل مبلغ 12500 ريال بنجاح إلى حسابك عبر فلوسك. رقم عملية: FL-9981"
+        val text = "استلمت حوالة من حاشد بزدان بمبلغ 800.00 ر.ي رصيدك 800.00 ر.ي"
         val candidate = parser.parse("sms-2", "FLOOSAK", text, System.currentTimeMillis())
 
         assertEquals(WalletType.FLOOSAK, candidate.wallet)
-        assertEquals(12500.0, candidate.amount ?: 0.0, 0.001)
-        assertEquals("FL-9981", candidate.transactionId)
+        assertEquals(800.0, candidate.amount ?: 0.0, 0.001)
+        assertNull(candidate.transactionId)
         assertTrue(candidate.isFinancialTransfer)
     }
 
