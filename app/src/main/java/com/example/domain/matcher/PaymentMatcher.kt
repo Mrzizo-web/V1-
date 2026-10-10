@@ -23,8 +23,7 @@ sealed class MatchOutcome {
  * Intelligent deduplication and multi-message correlation engine.
  */
 class PaymentMatcher(
-    private val paymentDao: PaymentDao,
-    private val timeWindowMillis: Long = 5 * 60 * 1000L // 5 minutes window
+    private val paymentDao: PaymentDao
 ) {
 
     suspend fun matchCandidate(candidate: PaymentCandidate): MatchOutcome {
