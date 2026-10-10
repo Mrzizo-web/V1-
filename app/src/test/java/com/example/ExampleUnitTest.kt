@@ -2,7 +2,6 @@ package com.example
 
 import com.example.domain.model.WalletType
 import com.example.domain.parser.FloosakParser
-import com.example.domain.parser.HawalyParser
 import com.example.domain.parser.JeebParser
 import com.example.domain.parser.WalletDetector
 import org.junit.Assert.assertEquals
@@ -21,7 +20,7 @@ class ExampleUnitTest {
         assertEquals(WalletType.JEEB, detector.detectWallet("JEEB", "تم إيداع 5000 ريال"))
         assertEquals(WalletType.JEEB, detector.detectWallet("KURAMI", "إشعار محفظة جيب: تم استلام حوالة"))
         assertEquals(WalletType.FLOOSAK, detector.detectWallet("FLOOSAK", "تم التحويل إلى محفظتك"))
-        assertEquals(WalletType.HAWALY, detector.detectWallet("HAWALY", "وصلت حوالة جديدة"))
+        assertEquals(WalletType.UNKNOWN, detector.detectWallet("HAWALY", "وصلت حوالة جديدة"))
         assertEquals(WalletType.UNKNOWN, detector.detectWallet("1002", "عرض خاص لعملاء يمن موبايل"))
     }
 
