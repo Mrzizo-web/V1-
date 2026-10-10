@@ -32,7 +32,7 @@ fun WalletBadge(
     val (bgColor, textColor, icon) = when (wallet) {
         WalletType.JEEB -> Triple(Color(0xFF004D40), Color(0xFF80CBC4), Icons.Default.AccountBalanceWallet)
         WalletType.FLOOSAK -> Triple(Color(0xFF1A237E), Color(0xFF9FA8DA), Icons.Default.CreditCard)
-        WalletType.HAWALY -> Triple(Color(0xFF3E2723), Color(0xFFBCAAA4), Icons.Default.Send)
+        WalletType.JAWALI -> Triple(Color(0xFF3E2723), Color(0xFFBCAAA4), Icons.Default.Send)
         WalletType.UNKNOWN -> Triple(Color(0xFF37474F), Color(0xFFCFD8DC), Icons.Default.AccountBalanceWallet)
     }
 
