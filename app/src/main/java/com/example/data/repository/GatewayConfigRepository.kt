@@ -68,7 +68,7 @@ class GatewayConfigRepository(
     private fun hashPin(pin: String): String {
         val salt = ByteArray(SALT_BYTES).also { SecureRandom().nextBytes(it) }
         val hash = derivePinHash(pin, salt, ITERATIONS)
-        return "$PIN_PREFIX$ITERATIONS$SEPARATOR" +
+        return PIN_PREFIX + SEPARATOR + ITERATIONS + SEPARATOR +
             Base64.encodeToString(salt, Base64.NO_WRAP) + SEPARATOR +
             Base64.encodeToString(hash, Base64.NO_WRAP)
     }
