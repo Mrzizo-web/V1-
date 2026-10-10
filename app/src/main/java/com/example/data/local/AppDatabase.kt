@@ -41,7 +41,42 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE gateway_config DROP COLUMN hawalySenderKeyword")
+                // Rebuild instead of DROP COLUMN: older Android SQLite versions do not support it.
+                // Copy retained configuration values and discard only the retired Hawaly field.
+                database.execSQL("""
+                    CREATE TABLE gateway_config_new (
+                        id INTEGER NOT NULL,
+                        deviceId TEXT NOT NULL,
+                        posIpAddress TEXT NOT NULL,
+                        posPort INTEGER NOT NULL,
+                        connectionMode TEXT NOT NULL,
+                        isAutoSyncEnabled INTEGER NOT NULL,
+                        maxRetryCount INTEGER NOT NULL,
+                        retryDelaySeconds INTEGER NOT NULL,
+                        isLoggingEnabled INTEGER NOT NULL,
+                        isGatewayActive INTEGER NOT NULL,
+                        adminPin TEXT NOT NULL,
+                        jeebSenderKeyword TEXT NOT NULL,
+                        floosakSenderKeyword TEXT NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                """.trimIndent())
+                database.execSQL("""
+                    INSERT INTO gateway_config_new (
+                        id, deviceId, posIpAddress, posPort, connectionMode,
+                        isAutoSyncEnabled, maxRetryCount, retryDelaySeconds,
+                        isLoggingEnabled, isGatewayActive, adminPin,
+                        jeebSenderKeyword, floosakSenderKeyword
+                    )
+                    SELECT
+                        id, deviceId, posIpAddress, posPort, connectionMode,
+                        isAutoSyncEnabled, maxRetryCount, retryDelaySeconds,
+                        isLoggingEnabled, isGatewayActive, adminPin,
+                        jeebSenderKeyword, floosakSenderKeyword
+                    FROM gateway_config
+                """.trimIndent())
+                database.execSQL("DROP TABLE gateway_config")
+                database.execSQL("ALTER TABLE gateway_config_new RENAME TO gateway_config")
             }
         }
 
