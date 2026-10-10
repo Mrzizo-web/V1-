@@ -42,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 // Rebuild instead of DROP COLUMN: older Android SQLite versions do not support it.
-                // Copy retained configuration values and discard only the retired Hawaly field.
+                // Copy retained configuration values and discard only the retired wallet field.
                 database.execSQL("""
                     CREATE TABLE gateway_config_new (
                         id INTEGER NOT NULL,
