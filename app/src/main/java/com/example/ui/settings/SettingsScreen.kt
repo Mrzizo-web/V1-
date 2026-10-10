@@ -425,7 +425,7 @@ fun SettingsScreen(
                         successNotice = "تم حفظ الإعدادات بنجاح"
                     },
                     { errorMsg ->
-                        successNotice = null
+                        successNotice = errorMsg
                     }
                 )
             },
