@@ -16,7 +16,8 @@ data class GatewayConfigEntity(
     val retryDelaySeconds: Int = 15,
     val isLoggingEnabled: Boolean = true,
     val isGatewayActive: Boolean = true,
-    // Empty by default: first-run setup must define an administrator PIN. Never ship a default PIN.\n    val adminPin: String = "",
+    // Empty by default: first-run setup must define an administrator PIN. Never ship a default PIN.
+    val adminPin: String = "",
     val jeebSenderKeyword: String = "JEEB",
     val floosakSenderKeyword: String = "FLOOSAK"
 )
