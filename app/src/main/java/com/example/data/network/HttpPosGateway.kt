@@ -1,10 +1,10 @@
 package com.example.data.network
 
+import android.content.Context
 import com.example.data.local.dao.GatewayConfigDao
 import com.example.data.local.entity.PaymentEntity
 import com.example.data.network.model.PaymentEventDto
 import com.example.data.network.model.PosAckResponse
-import android.content.Context
 import com.example.security.GatewaySecretStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class HttpPosGateway(
@@ -30,16 +31,29 @@ class HttpPosGateway(
 
     override suspend fun checkConnection(): Boolean = withContext(Dispatchers.IO) {
         val config = configDao.getConfig() ?: return@withContext false
+        val token = GatewaySecretStore.decrypt(context, config.gatewayToken)
+        val deviceId = config.deviceId.trim()
+        if (token.length < 32 || deviceId.isBlank() || config.posIpAddress.isBlank()) {
+            return@withContext false
+        }
+
+        val eventId = "status-" + UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis().toString()
+        val signature = GatewayRequestSigner.sign(token, timestamp, eventId, deviceId, "")
         val url = "http://${config.posIpAddress}:${config.posPort}/api/status"
 
-        return@withContext try {
+        try {
             val request = Request.Builder()
                 .url(url)
                 .get()
+                .header(GatewayRequestSigner.DEVICE_ID_HEADER, deviceId)
+                .header(GatewayRequestSigner.EVENT_ID_HEADER, eventId)
+                .header(GatewayRequestSigner.TIMESTAMP_HEADER, timestamp)
+                .header(GatewayRequestSigner.SIGNATURE_HEADER, signature)
                 .build()
 
             client.newCall(request).execute().use { response ->
-                response.isSuccessful || response.code == 404 // 404 still means host & port reachable
+                response.isSuccessful
             }
         } catch (_: Exception) {
             false
@@ -49,15 +63,27 @@ class HttpPosGateway(
     override suspend fun sendPayment(payment: PaymentEntity, eventId: String): PosAckResponse =
         withContext(Dispatchers.IO) {
             val config = configDao.getConfig()
-            val deviceId = config?.deviceId ?: "GATEWAY_DEV_01"
-            val ip = config?.posIpAddress ?: "192.168.1.100"
-            val port = config?.posPort ?: 8080
-            val url = "http://$ip:$port/api/sms/ingest"
+                ?: return@withContext PosAckResponse(
+                    isSuccess = false,
+                    httpStatusCode = null,
+                    errorMessage = "Gateway connection settings are not configured"
+                )
 
+            val deviceId = config.deviceId.trim()
+            val token = GatewaySecretStore.decrypt(context, config.gatewayToken)
+            val ip = config.posIpAddress.trim()
+            val port = config.posPort
+            if (token.length < 32 || deviceId.isBlank() || ip.isBlank() || eventId.isBlank()) {
+                return@withContext PosAckResponse(
+                    isSuccess = false,
+                    httpStatusCode = null,
+                    errorMessage = "A POS address, authorized device ID, stable event ID, and 32+ character HMAC key are required"
+                )
+            }
+
+            val url = "http://$ip:$port/api/sms/ingest"
             val eventDto = PaymentEventDto.fromEntity(payment, deviceId, eventId)
             val jsonBody = JSONObject().apply {
-                // POS currently accepts the canonical SMS ingestion endpoint.
-                // Metadata headers remain available for the hardened POS endpoint.
                 put("sender", eventDto.sender ?: "")
                 put("body", eventDto.rawMessage)
                 put("eventId", eventDto.eventId)
@@ -78,14 +104,16 @@ class HttpPosGateway(
                 put("status", eventDto.status)
             }.toString()
 
+            val timestamp = System.currentTimeMillis().toString()
+            val signature = GatewayRequestSigner.sign(token, timestamp, eventId, deviceId, jsonBody)
             val request = Request.Builder()
                 .url(url)
-                .header("Idempotency-Key", payment.paymentId)
-                .header("X-Gateway-Device-Id", deviceId)
-                .header("X-Gateway-Event-Id", eventId)
-                .apply {
-                    config?.gatewayToken?.let { GatewaySecretStore.decrypt(context, it).takeIf(String::isNotBlank) }?.let { header("X-Gateway-Token", it) }
-                }
+                .header("Idempotency-Key", eventId)
+                .header(GatewayRequestSigner.DEVICE_ID_HEADER, deviceId)
+                .header(GatewayRequestSigner.EVENT_ID_HEADER, eventId)
+                .header(GatewayRequestSigner.TIMESTAMP_HEADER, timestamp)
+                .header(GatewayRequestSigner.SIGNATURE_HEADER, signature)
+                .header("Content-Type", "application/json; charset=UTF-8")
                 .post(jsonBody.toRequestBody(jsonMediaType))
                 .build()
 
