@@ -124,12 +124,12 @@ fun SmsSimulatorDialog(
 
                 OutlinedButton(
                     onClick = {
-                        senderInput = "HAWALY"
-                        messageInput = "حوالتي: استلمت دفعة بقيمة 20,000 ريال. رقم الحوالة: HW-3312"
+                        senderInput = "JAWALI"
+                        messageInput = "لقد استلمت YER 16000 كقيمة مشتريات بمرجع 468486397181 من عميد محمد احمد احمد"
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("حوالتي (20,000)", fontSize = 11.sp)
+                    Text("جوالي (16,000)", fontSize = 11.sp)
                 }
             }
 
