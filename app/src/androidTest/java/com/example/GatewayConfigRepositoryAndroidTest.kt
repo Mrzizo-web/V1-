@@ -56,4 +56,17 @@ class GatewayConfigRepositoryAndroidTest {
         assertTrue(repository.verifyPin("2468"))
         assertFalse(repository.verifyPin("8642"))
     }
+    @Test
+    fun savingOtherSettingsWithBlankNewPinPreservesExistingPinHash() = runBlocking {
+        assertTrue(repository.verifyPin("4826"))
+        val current = repository.getCurrentConfig()
+        repository.updateConfig(current.copy(posIpAddress = "192.168.1.20", adminPin = ""))
+
+        val stored = db.gatewayConfigDao().getConfig()!!.adminPin
+        assertTrue(AdminPinHasher.isHash(stored))
+        assertTrue(repository.verifyPin("4826"))
+        assertFalse(repository.verifyPin("1111"))
+        assertFalse(repository.verifyPin(""))
+    }
+
 }
