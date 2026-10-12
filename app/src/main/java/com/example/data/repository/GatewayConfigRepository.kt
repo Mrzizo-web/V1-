@@ -6,6 +6,7 @@ import android.content.Context
 import com.example.security.GatewaySecretStore
 import com.example.security.AdminPinHasher
 import java.security.MessageDigest
+import android.util.Base64
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -16,9 +17,29 @@ class GatewayConfigRepository(
     val configFlow: Flow<GatewayConfigEntity> = configDao.observeConfig().map { it ?: GatewayConfigEntity() }
 
     suspend fun getCurrentConfig(): GatewayConfigEntity {
-        return configDao.getConfig() ?: GatewayConfigEntity().also {
+        val current = configDao.getConfig() ?: GatewayConfigEntity().also {
             configDao.insertOrUpdate(it)
         }
+        val storedToken = current.gatewayToken
+        if (storedToken.isBlank() || GatewaySecretStore.decrypt(context, storedToken).isNotBlank()) {
+            return current
+        }
+
+        // Migrate common legacy raw tokens (32-64 chars) once. Current encrypted
+        // records decode to at least 60 bytes (12-byte IV + key bytes + GCM tag);
+        // if such a record cannot decrypt, fail closed rather than re-encrypting it.
+        if (storedToken.length !in 32..64) return current
+        val decodedSize = runCatching {
+            Base64.decode(storedToken, Base64.NO_WRAP).size
+        }.getOrNull()
+        if (decodedSize != null && decodedSize >= 60) return current
+
+        val encrypted = runCatching {
+            GatewaySecretStore.encrypt(context, storedToken)
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return current
+        val migrated = current.copy(gatewayToken = encrypted)
+        configDao.insertOrUpdate(migrated)
+        return migrated
     }
 
     suspend fun updateConfig(updated: GatewayConfigEntity) {

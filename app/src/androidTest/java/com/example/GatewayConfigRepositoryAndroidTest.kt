@@ -6,8 +6,10 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.entity.GatewayConfigEntity
 import com.example.data.repository.GatewayConfigRepository
 import com.example.security.AdminPinHasher
+import com.example.security.GatewaySecretStore
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -67,6 +69,20 @@ class GatewayConfigRepositoryAndroidTest {
         assertTrue(repository.verifyPin("4826"))
         assertFalse(repository.verifyPin("1111"))
         assertFalse(repository.verifyPin(""))
+    }
+
+    @Test
+    fun legacyPlaintextGatewayTokenMigratesToKeystoreEncryptedValue() = runBlocking {
+        val legacyToken = "legacy-shared-token-0123456789-ABCDEFGH"
+        db.gatewayConfigDao().insertOrUpdate(GatewayConfigEntity(gatewayToken = legacyToken))
+
+        val migrated = repository.getCurrentConfig()
+        assertNotEquals(legacyToken, migrated.gatewayToken)
+        assertEquals(legacyToken, GatewaySecretStore.decrypt(
+            InstrumentationRegistry.getInstrumentation().targetContext,
+            migrated.gatewayToken
+        ))
+        assertEquals(migrated.gatewayToken, db.gatewayConfigDao().getConfig()!!.gatewayToken)
     }
 
 }
