@@ -54,6 +54,9 @@ fun SettingsScreen(
     var enteredPin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
     var successNotice by remember { mutableStateOf<String?>(null) }
+    var hasConfiguredPin by remember(currentConfig.adminPin) {
+        mutableStateOf(currentConfig.adminPin.isNotBlank())
+    }
 
     // Form states
     var deviceId by remember(currentConfig) { mutableStateOf(currentConfig.deviceId) }
@@ -103,6 +106,7 @@ fun SettingsScreen(
                             enteredPin,
                             {
                                 isUnlocked = true
+                                hasConfiguredPin = true
                                 pinDialogVisible = false
                                 pinError = null
                             },
@@ -343,7 +347,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = newPin,
                     onValueChange = { newPin = it },
-                    label = { Text("رمز PIN الجديد") },
+                    label = { Text("PIN الجديد (اختياري؛ اتركه فارغًا للإبقاء على الحالي)") },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     modifier = Modifier.fillMaxWidth(),
@@ -355,7 +359,7 @@ fun SettingsScreen(
         Button(
             onClick = {
                 val changingPin = newPin.isNotBlank()
-                val settingFirstPin = currentConfig.adminPin.isBlank()
+                val settingFirstPin = !hasConfiguredPin
                 if ((settingFirstPin && !changingPin) ||
                     (changingPin && (newPin.length !in 4..6 || !newPin.all { it.isDigit() }))
                 ) {
