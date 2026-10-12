@@ -22,6 +22,12 @@ interface GatewayConfigDao {
     @Update
     suspend fun updateConfig(config: GatewayConfigEntity)
 
+    @Query("UPDATE gateway_config SET adminPin = :pin WHERE id = 1")
+    suspend fun updateAdminPin(pin: String)
+
+    @Query("UPDATE gateway_config SET adminPin = :pin WHERE id = 1 AND adminPin = ''")
+    suspend fun setInitialAdminPin(pin: String): Int
+
     @Query("UPDATE gateway_config SET isGatewayActive = :active WHERE id = 1")
     suspend fun setGatewayActive(active: Boolean)
 }

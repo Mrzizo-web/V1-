@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.UUID
 
@@ -234,16 +235,37 @@ class MainViewModel(
         }
     }
 
+    fun verifyAdminPin(enteredPin: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val valid = try {
+                configRepository.verifyPin(enteredPin)
+            } catch (_: Exception) {
+                false
+            }
+            withContext(Dispatchers.Main) {
+                if (valid) onSuccess() else onError("PIN غير صحيح أو يجب أن يحتوي على 4 إلى 6 أرقام")
+            }
+        }
+    }
+
     fun updateConfig(newConfig: GatewayConfigEntity, enteredPin: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val valid = configRepository.verifyPin(enteredPin)
+            val valid = try {
+                configRepository.verifyPin(enteredPin)
+            } catch (_: Exception) {
+                false
+            }
             if (!valid) {
-                onError("رمز PIN غير صحيح!")
+                withContext(Dispatchers.Main) { onError("رمز PIN غير صحيح!") }
                 return@launch
             }
-            configRepository.updateConfig(newConfig)
-            repository.logEvent("CONFIG_UPDATED", "تم تحديث إعدادات Gateway بنجاح", level = "INFO")
-            onSuccess()
+            try {
+                configRepository.updateConfig(newConfig)
+                repository.logEvent("CONFIG_UPDATED", "تم تحديث إعدادات Gateway بنجاح", level = "INFO")
+                withContext(Dispatchers.Main) { onSuccess() }
+            } catch (error: Exception) {
+                withContext(Dispatchers.Main) { onError(error.localizedMessage ?: "تعذر حفظ الإعدادات") }
+            }
         }
     }
 }

@@ -269,6 +269,9 @@ fun GatewayMainScreen(viewModel: MainViewModel) {
                     currentConfig = uiState.config,
                     onSaveConfig = { updated, pin, onSuccess, onError ->
                         viewModel.updateConfig(updated, pin, onSuccess, onError)
+                    },
+                    onVerifyPin = { pin, onSuccess, onError ->
+                        viewModel.verifyAdminPin(pin, onSuccess, onError)
                     }
                 )
             }

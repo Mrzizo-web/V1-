@@ -46,7 +46,8 @@ import com.example.data.local.entity.GatewayConfigEntity
 @Composable
 fun SettingsScreen(
     currentConfig: GatewayConfigEntity,
-    onSaveConfig: (GatewayConfigEntity, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit
+    onSaveConfig: (GatewayConfigEntity, pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit,
+    onVerifyPin: (pin: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit
 ) {
     var isUnlocked by remember { mutableStateOf(false) }
     var pinDialogVisible by remember { mutableStateOf(!isUnlocked) }
@@ -98,13 +99,15 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if ((currentConfig.adminPin.isBlank() && enteredPin.isBlank()) || (!currentConfig.adminPin.isBlank() && enteredPin == currentConfig.adminPin)) {
-                            isUnlocked = true
-                            pinDialogVisible = false
-                            pinError = null
-                        } else {
-                            pinError = "رمز PIN غير صحيح!"
-                        }
+                        onVerifyPin(
+                            enteredPin,
+                            {
+                                isUnlocked = true
+                                pinDialogVisible = false
+                                pinError = null
+                            },
+                            { errorMessage -> pinError = errorMessage }
+                        )
                     },
                     modifier = Modifier.testTag("pin_confirm_button")
                 ) {
