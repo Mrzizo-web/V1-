@@ -39,7 +39,9 @@ class HttpPosGateway(
 
         val eventId = "status-" + UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis().toString()
-        val signature = GatewayRequestSigner.sign(token, timestamp, eventId, deviceId, "")
+        val signature = GatewayRequestSigner.sign(
+            token, "GET", "/api/status", timestamp, eventId, deviceId, ""
+        )
         val url = "http://${config.posIpAddress}:${config.posPort}/api/status"
 
         try {
@@ -105,7 +107,9 @@ class HttpPosGateway(
             }.toString()
 
             val timestamp = System.currentTimeMillis().toString()
-            val signature = GatewayRequestSigner.sign(token, timestamp, eventId, deviceId, jsonBody)
+            val signature = GatewayRequestSigner.sign(
+                token, "POST", "/api/sms/ingest", timestamp, eventId, deviceId, jsonBody
+            )
             val request = Request.Builder()
                 .url(url)
                 .header("Idempotency-Key", eventId)
