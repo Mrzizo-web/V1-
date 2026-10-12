@@ -354,8 +354,12 @@ fun SettingsScreen(
 
         Button(
             onClick = {
-                if (newPin.length !in 4..6 || !newPin.all { it.isDigit() }) {
-                    successNotice = "يجب أن يكون PIN الجديد من 4 إلى 6 أرقام."
+                val changingPin = newPin.isNotBlank()
+                val settingFirstPin = currentConfig.adminPin.isBlank()
+                if ((settingFirstPin && !changingPin) ||
+                    (changingPin && (newPin.length !in 4..6 || !newPin.all { it.isDigit() }))
+                ) {
+                    successNotice = "أدخل PIN من 4 إلى 6 أرقام عند الإعداد الأول أو عند تغيير الرمز."
                     return@Button
                 }
                 val updated = currentConfig.copy(
