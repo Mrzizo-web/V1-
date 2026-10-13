@@ -2,8 +2,6 @@ package com.example
 
 import android.app.Application
 import android.util.Log
-import androidx.work.Configuration
-import androidx.work.WorkManager
 import com.example.data.local.AppDatabase
 import com.example.data.network.HttpPosGateway
 import com.example.data.repository.GatewayConfigRepository
@@ -53,18 +51,10 @@ class GatewayApplication : Application() {
             parserRegistry = parserRegistry
         )
 
-        // Initialize through AndroidX Startup on devices. Robolectric and some
-        // custom host processes do not execute ContentProvider initializers, so
-        // initialize explicitly only when WorkManager is truly unavailable.
-        runCatching { WorkManager.getInstance(this) }.onFailure {
-            runCatching {
-                WorkManager.initialize(this, Configuration.Builder().build())
-            }.onFailure { error ->
-                Log.w("GatewayApplication", "Could not initialize background scheduler", error)
-            }
-        }
-        // Durable work is scheduled by WorkManager rather than a permanent
-        // dataSync foreground service (restricted on recent Android versions).
+        // Android initializes WorkManager through its startup provider on-device.
+        // Unit-test host processes may not run that provider, so scheduling failure
+        // must not prevent parsers, Room, or the login screen from starting.
+        // The periodic job is registered again on boot and on next app launch.
         runCatching { GatewaySyncScheduler.schedulePeriodic(this) }.onFailure { error ->
             Log.w("GatewayApplication", "Could not register periodic background sync", error)
         }
