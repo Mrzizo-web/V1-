@@ -25,10 +25,11 @@ class GatewayConfigRepository(
             return current
         }
 
-        // Migrate common legacy raw tokens (32-64 chars) once. Current encrypted
-        // records decode to at least 60 bytes (12-byte IV + key bytes + GCM tag);
-        // if such a record cannot decrypt, fail closed rather than re-encrypting it.
-        if (storedToken.length !in 32..64) return current
+        // Migrate legacy plaintext tokens of any supported length. Encoded legacy
+        // ciphertext candidates (12-byte IV + at least a GCM tag, 60+ decoded bytes)
+        // remain untouched if they cannot be decrypted, so an invalidated Keystore
+        // record is never silently re-encrypted as though it were a new secret.
+        if (storedToken.length < GatewaySecretStore.MIN_TOKEN_LENGTH) return current
         val decodedSize = runCatching {
             Base64.decode(storedToken, Base64.NO_WRAP).size
         }.getOrNull()

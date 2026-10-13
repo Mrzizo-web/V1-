@@ -29,8 +29,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
                     val config = app.configRepository.getCurrentConfig()
                     if (config.isGatewayActive) {
                         GatewayForegroundService.startService(context)
-                        // Trigger immediate sync of any leftover queued items
-                        app.repository.syncPendingPayments()
+                        // The foreground service owns queue recovery/sync. Avoid a second
+                        // network worker inside goAsync(), which can outlive the boot broadcast.
                     }
                 } catch (e: Exception) {
                     app.repository.logEvent("BOOT_RECOVERY_ERROR", "Error during boot recovery: ${e.message}", level = "ERROR")

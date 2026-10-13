@@ -85,4 +85,17 @@ class GatewayConfigRepositoryAndroidTest {
         assertEquals(migrated.gatewayToken, db.gatewayConfigDao().getConfig()!!.gatewayToken)
     }
 
+    @Test
+    fun legacyPlaintextGatewayTokenLongerThan64CharactersIsMigrated() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val legacyToken = "legacy-token-" + "!".repeat(80)
+        assertTrue(legacyToken.length > 64)
+        db.gatewayConfigDao().insertOrUpdate(GatewayConfigEntity(gatewayToken = legacyToken))
+
+        val migrated = repository.getCurrentConfig()
+        assertNotEquals(legacyToken, migrated.gatewayToken)
+        assertEquals(legacyToken, GatewaySecretStore.decrypt(context, migrated.gatewayToken))
+        assertEquals(migrated.gatewayToken, db.gatewayConfigDao().getConfig()!!.gatewayToken)
+    }
+
 }
