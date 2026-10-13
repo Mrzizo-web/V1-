@@ -34,7 +34,7 @@ class GatewaySyncWorkerPolicyTest {
         assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 4)), 5))
         assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 5)), 5))
         assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 6)), 5))
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 0)), 0).not())
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 0)), 0))
     }
 
     @Test
