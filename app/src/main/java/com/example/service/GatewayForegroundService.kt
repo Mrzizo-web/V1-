@@ -10,21 +10,14 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.example.GatewayApplication
 import com.example.MainActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import com.example.worker.GatewaySyncScheduler
 
-class GatewayForegroundService : Service {
-
-    constructor() : super()
-
-    private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
-    private var syncJob: Job? = null
+/**
+ * Compatibility bridge for older callers. It does not run a polling loop:
+ * durable sync is owned by WorkManager to comply with Android 15+ FGS limits.
+ */
+class GatewayForegroundService : Service() {
 
     companion object {
         const val CHANNEL_ID = "power_fuel_gateway_channel"
@@ -40,42 +33,16 @@ class GatewayForegroundService : Service {
         }
 
         fun stopService(context: Context) {
-            val intent = Intent(context, GatewayForegroundService::class.java)
-            context.stopService(intent)
+            context.stopService(Intent(context, GatewayForegroundService::class.java))
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Gateway يعمل بنشاط"))
-        startPeriodicSyncLoop()
-    }
-
-    private fun startPeriodicSyncLoop() {
-        syncJob?.cancel()
-        val app = applicationContext as? GatewayApplication ?: return
-
-        syncJob = serviceScope.launch {
-            while (isActive) {
-                try {
-                    val recoveredCount = app.repository.recoverPendingSms()
-                    val config = app.configRepository.getCurrentConfig()
-                    var syncedCount = 0
-                    if (config.isGatewayActive && config.isAutoSyncEnabled) {
-                        syncedCount = app.repository.syncPendingPayments()
-                    }
-                    if (recoveredCount > 0 || syncedCount > 0) {
-                        updateNotification(
-                            "استعادة $recoveredCount رسالة معلّقة؛ مزامنة $syncedCount حوالة"
-                        )
-                    }
-                } catch (_: Exception) {
-                    // Ignored in loop
-                }
-                delay(15_000L) // Check every 15 seconds
-            }
-        }
+        // A short-lived compatibility service may still be started by legacy UI paths.
+        // It must enter foreground immediately on Android O+ then hand work to WorkManager.
+        startForeground(NOTIFICATION_ID, buildNotification("جارٍ جدولة المزامنة بالخلفية"))
     }
 
     private fun createNotificationChannel() {
@@ -85,11 +52,10 @@ class GatewayForegroundService : Service {
                 "POWER FEUL SMS Gateway",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "قناة المراقبة والمزامنة الخلفية لبوابة الرسائل"
+                description = "قناة المزامنة الخلفية لبوابة الرسائل"
                 setShowBadge(false)
             }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
     }
 
@@ -105,24 +71,21 @@ class GatewayForegroundService : Service {
             .setContentTitle("POWER FEUL SMS GATEWAY")
             .setContentText(statusText)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
-            .setOngoing(true)
+            .setOngoing(false)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
-    private fun updateNotification(statusText: String) {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager?.notify(NOTIFICATION_ID, buildNotification(statusText))
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+        runCatching { GatewaySyncScheduler.enqueueImmediate(this) }
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        syncJob?.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
