@@ -34,6 +34,10 @@ class LocalNetworkHostPolicyTest {
             "192.167.1.10",
             "10.0.0.256",
             "pos.example.com",
+            "127.attacker.example",
+            "127.0.0.1.attacker.example",
+            "127.evil",
+            "fd:not-an-ip",
             "http://192.168.1.10",
             ""
         ).forEach { host ->
