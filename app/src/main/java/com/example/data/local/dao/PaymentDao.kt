@@ -65,7 +65,7 @@ interface PaymentDao {
     suspend fun incrementMessageCount(paymentId: String, updatedAt: Long = System.currentTimeMillis())
 
     // Metrics counters
-    @Query("SELECT COUNT(*) FROM payments WHERE status IN ('QUEUED', 'PARSED')")
+    @Query("SELECT COUNT(*) FROM payments WHERE status IN ('QUEUED', 'PARSED', 'FAILED', 'SENT')")
     fun getPendingCount(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM payments WHERE status = 'ACKNOWLEDGED' AND receivedAt >= :startOfDay")

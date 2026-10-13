@@ -90,6 +90,7 @@ class GatewayRepositoryIdempotencyAndroidTest {
         val stored = db.paymentDao().getAllPayments().first().single()
         assertEquals(PaymentStatus.ACKNOWLEDGED, stored.status)
         assertEquals(listOf(stored.paymentId), pos.sentEventIds.toList())
+        assertEquals(0, db.paymentDao().getPendingCount().first())
     }
 
     @Test
