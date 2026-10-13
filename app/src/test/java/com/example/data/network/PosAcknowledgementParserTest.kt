@@ -38,6 +38,7 @@ class PosAcknowledgementParserTest {
             """{"success":false,"result":"UNMATCHED","smsId":"sms-123"}"""
         )
         assertFalse(result.isSuccess)
+        assertTrue(result.requiresReview)
         assertTrue(result.errorMessage!!.contains("manual review"))
     }
 
