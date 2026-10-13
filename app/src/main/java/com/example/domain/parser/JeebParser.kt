@@ -6,6 +6,13 @@ import com.example.domain.model.WalletType
 class JeebParser : BaseWalletParser(WalletType.JEEB, parserVersion = "2.0-jeeb-real") {
     override val supportedSenders: List<String> = listOf("JEEB", "جيب", "KURAMI", "ALKURAMI")
 
+    override fun canParse(sender: String, message: String): Boolean {
+        val text = normalizeDigits(message.trim())
+        return super.canParse(sender, message) ||
+            text.startsWith("اضيف ") ||
+            text.startsWith("خصم ")
+    }
+
     private val incoming = Regex("""^اضيف\s+(\d+(?:\.\d+)?)\s+ر\.ي\s+(.+?)\s+رص:(\d+(?:\.\d+)?)ر\.ي\s+من\s+(.+?)-(\d+)$""")
     private val outgoing = Regex("""^خصم\s+(\d+(?:\.\d+)?)\s+ر\.ي\s+(.+?)\s+رص:(\d+(?:\.\d+)?)ر\.ي\s+الى\s+(\d+)\s+(.+)$""")
 
