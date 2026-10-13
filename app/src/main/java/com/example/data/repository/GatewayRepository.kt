@@ -340,23 +340,37 @@ class GatewayRepository(
             )
         )
 
-        return if (result.isSuccess) {
+        if (result.isSuccess) {
             paymentDao.updateStatus(current.paymentId, PaymentStatus.ACKNOWLEDGED)
             logEvent("ACKNOWLEDGED", "$timeStr ACKNOWLEDGED by POS for payment ${current.paymentId.take(8)}", level = "SUCCESS")
-            true
-        } else {
-            val updated = current.copy(
-                status = PaymentStatus.FAILED,
-                retryCount = current.retryCount + 1,
-                lastSyncAttemptAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis(),
-                syncErrorMessage = result.errorMessage
-            )
-            paymentDao.updatePayment(updated)
-            val errorText = result.errorMessage ?: "POS unreachable"
-            logEvent("SYNC_FAILED", "$timeStr FAILED: $errorText. In offline queue.", level = "ERROR")
-            false
+            return true
         }
+        if (result.requiresReview) {
+            val held = current.copy(
+                status = PaymentStatus.NEEDS_REVIEW,
+                updatedAt = System.currentTimeMillis(),
+                lastSyncAttemptAt = System.currentTimeMillis(),
+                syncErrorMessage = result.errorMessage ?: "POS received the SMS but requires manual review"
+            )
+            paymentDao.updatePayment(held)
+            logEvent(
+                "POS_REVIEW_REQUIRED",
+                "$timeStr POS could not create a wallet transaction for payment ${current.paymentId.take(8)}; automatic retries stopped",
+                level = "WARN"
+            )
+            return false
+        }
+        val updated = current.copy(
+            status = PaymentStatus.FAILED,
+            retryCount = current.retryCount + 1,
+            lastSyncAttemptAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis(),
+            syncErrorMessage = result.errorMessage
+        )
+        paymentDao.updatePayment(updated)
+        val errorText = result.errorMessage ?: "POS unreachable"
+        logEvent("SYNC_FAILED", "$timeStr FAILED: $errorText. In offline queue.", level = "ERROR")
+        return false
     }
 
     /**
