@@ -7,7 +7,7 @@ import com.example.data.repository.GatewayConfigRepository
 import com.example.data.repository.GatewayRepository
 import com.example.domain.parser.ParserRegistry
 import com.example.domain.parser.WalletDetector
-import com.example.service.GatewayForegroundService
+import com.example.worker.GatewaySyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,14 +50,17 @@ class GatewayApplication : Application() {
             parserRegistry = parserRegistry
         )
 
-        // Boot logging and auto service start
+        // Durable work is scheduled by WorkManager rather than a permanent
+        // dataSync foreground service (restricted on recent Android versions).
+        GatewaySyncScheduler.schedulePeriodic(this)
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 repository.recoverPendingSms()
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 repository.logEvent(
                     tag = "SMS_RECOVERY_STARTUP_ERROR",
-                    message = "Could not recover pending SMS after app startup: " + error.message,
+                    message = "Could not recover pending SMS after app startup",
                     level = "ERROR"
                 )
             }
@@ -70,16 +73,12 @@ class GatewayApplication : Application() {
 
             repository.logEvent(
                 tag = "APP_START",
-                message = "POWER FEUL SMS GATEWAY initialized (Device ID: ${config.deviceId})",
+                message = "POWER FEUL SMS GATEWAY initialized (Device ID configured)",
                 level = "INFO"
             )
 
-            if (config.isGatewayActive) {
-                try {
-                    GatewayForegroundService.startService(this@GatewayApplication)
-                } catch (_: Exception) {
-                    // Handled if background start restrictions apply
-                }
+            if (config.isGatewayActive && config.isAutoSyncEnabled) {
+                runCatching { GatewaySyncScheduler.enqueueImmediate(this@GatewayApplication) }
             }
         }
     }
