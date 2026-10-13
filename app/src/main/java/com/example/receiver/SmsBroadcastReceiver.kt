@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsMessage
 import com.example.GatewayApplication
+import com.example.worker.GatewaySyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,6 +56,13 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                         body = fullBody,
                         receivedAt = timestamp
                     )
+
+                    // Persist the SMS first; then enqueue sync work. If the process dies,
+                    // the periodic worker will recover the pending local row later.
+                    val config = app.configRepository.getCurrentConfig()
+                    if (config.isGatewayActive && config.isAutoSyncEnabled) {
+                        GatewaySyncScheduler.enqueueImmediate(context)
+                    }
                 }
             } catch (e: Exception) {
                 app.repository.logEvent("SMS_RECEIVER_ERROR", "Error parsing SMS intent: ${e.message}", level = "ERROR")
