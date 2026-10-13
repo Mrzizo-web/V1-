@@ -255,15 +255,44 @@ class GatewayRepositoryIdempotencyAndroidTest {
         assertEquals(listOf("already-created-payment"), pos.sentEventIds.toList())
     }
 
+    @Test
+    fun posUnmatchedResponseMovesPaymentToReviewWithoutAutomaticRetries() = runBlocking {
+        repository.processIncomingSms(
+            smsId = "pos-unmatched-review",
+            sender = "KURAMI",
+            body = incomingJeeb,
+            receivedAt = System.currentTimeMillis()
+        )
+        pos.nextResponse = PosAckResponse(
+            isSuccess = false,
+            httpStatusCode = 200,
+            rawResponse = """{"success":false,"result":"UNMATCHED","smsId":"pos-unmatched-review"}""",
+            errorMessage = "POS could not create a wallet transaction; manual review is required",
+            requiresReview = true
+        )
+
+        assertEquals(0, repository.syncPendingPayments())
+        val payment = db.paymentDao().getAllPayments().first().single()
+        assertEquals(PaymentStatus.NEEDS_REVIEW, payment.status)
+        assertTrue(db.paymentDao().getPendingSyncPayments().isEmpty())
+        assertEquals(1, pos.sentEventIds.size)
+
+        repository.syncPendingPayments()
+        val afterSecondSync = db.paymentDao().getAllPayments().first().single()
+        assertEquals(PaymentStatus.NEEDS_REVIEW, afterSecondSync.status)
+        assertEquals("Manual-review payments must not be automatically retried", 1, pos.sentEventIds.size)
+    }
+
     private class RecordingPosGateway : PosGateway {
         val sentEventIds = Collections.synchronizedList(mutableListOf<String>())
         @Volatile var nextSuccess: Boolean = true
+        @Volatile var nextResponse: PosAckResponse? = null
 
         override suspend fun checkConnection(): Boolean = true
 
         override suspend fun sendPayment(payment: PaymentEntity, eventId: String): PosAckResponse {
             sentEventIds.add(eventId)
-            return PosAckResponse(
+            return nextResponse ?: PosAckResponse(
                 isSuccess = nextSuccess,
                 httpStatusCode = if (nextSuccess) 200 else 503,
                 rawResponse = if (nextSuccess) """{"success":true,"result":"CREATED"}""" else null,
