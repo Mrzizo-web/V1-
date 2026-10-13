@@ -260,7 +260,9 @@ class GatewayRepository(
         }
 
         val timeStr = formatTime(System.currentTimeMillis())
-        logEvent("SENDING", "\$timeStr SENDING TO POS: ${current.amount} YER (ID: ${current.paymentId.take(8)})", level = "INFO")
+        logEvent("SENDING", "$timeStr SENDING TO POS: ${current.amount} YER (ID: ${current.paymentId.take(8)})", level = "INFO")
+        val endpointHost = config?.posIpAddress ?: "unknown"
+        val endpointPort = config?.posPort ?: 8080
 
         // Payment ID is the durable idempotency key and remains unchanged on retry.
         val eventId = current.paymentId
@@ -271,7 +273,7 @@ class GatewayRepository(
                 attemptedAt = System.currentTimeMillis(),
                 isSuccess = result.isSuccess,
                 httpStatusCode = result.httpStatusCode,
-                endpoint = "http://${config?.posIpAddress ?: "unknown"}:${config?.posPort ?: 8080}",
+                endpoint = "http://$endpointHost:$endpointPort",
                 responseBody = result.rawResponse,
                 errorMessage = result.errorMessage
             )
@@ -279,7 +281,7 @@ class GatewayRepository(
 
         if (result.isSuccess) {
             paymentDao.updateStatus(current.paymentId, PaymentStatus.ACKNOWLEDGED)
-            logEvent("ACKNOWLEDGED", "\$timeStr ACKNOWLEDGED by POS for payment ${current.paymentId.take(8)}", level = "SUCCESS")
+            logEvent("ACKNOWLEDGED", "$timeStr ACKNOWLEDGED by POS for payment ${current.paymentId.take(8)}", level = "SUCCESS")
             true
         } else {
             val updated = current.copy(
@@ -290,7 +292,8 @@ class GatewayRepository(
                 syncErrorMessage = result.errorMessage
             )
             paymentDao.updatePayment(updated)
-            logEvent("SYNC_FAILED", "\$timeStr FAILED: ${result.errorMessage ?: "POS unreachable"}. In offline queue.", level = "ERROR")
+            val errorText = result.errorMessage ?: "POS unreachable"
+            logEvent("SYNC_FAILED", "$timeStr FAILED: $errorText. In offline queue.", level = "ERROR")
             false
         }
     }
