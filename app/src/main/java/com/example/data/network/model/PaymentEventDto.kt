@@ -25,7 +25,12 @@ data class PaymentEventDto(
     val status: String
 ) {
     companion object {
-        fun fromEntity(payment: PaymentEntity, deviceId: String, eventId: String): PaymentEventDto {
+        fun fromEntity(
+            payment: PaymentEntity,
+            deviceId: String,
+            eventId: String,
+            rawMessage: String = payment.rawMessageSnippet
+        ): PaymentEventDto {
             return PaymentEventDto(
                 eventId = eventId,
                 paymentId = payment.paymentId,
@@ -38,7 +43,7 @@ data class PaymentEventDto(
                 receivedAt = payment.receivedAt,
                 gatewayDeviceId = deviceId,
                 sourceSmsId = payment.initialSmsId,
-                rawMessage = payment.rawMessageSnippet,
+                rawMessage = rawMessage,
                 parserVersion = payment.parserVersion,
                 createdAt = payment.createdAt,
                 messageCount = payment.messageCount,

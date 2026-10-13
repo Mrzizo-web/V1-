@@ -2,6 +2,7 @@ package com.example.data.network
 
 import android.content.Context
 import com.example.data.local.dao.GatewayConfigDao
+import com.example.data.local.dao.SmsMessageDao
 import com.example.data.local.entity.PaymentEntity
 import com.example.data.network.model.PaymentEventDto
 import com.example.data.network.model.PosAckResponse
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit
 
 class HttpPosGateway(
     private val configDao: GatewayConfigDao,
+    private val smsMessageDao: SmsMessageDao,
     private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
@@ -84,7 +86,16 @@ class HttpPosGateway(
             }
 
             val url = "http://$ip:$port/api/sms/ingest"
-            val eventDto = PaymentEventDto.fromEntity(payment, deviceId, eventId)
+            val fullRawMessage = smsMessageDao.getMessageById(payment.initialSmsId)
+                ?.body
+                ?.takeIf { it.isNotBlank() }
+                ?: payment.rawMessageSnippet
+            val eventDto = PaymentEventDto.fromEntity(
+                payment = payment,
+                deviceId = deviceId,
+                eventId = eventId,
+                rawMessage = fullRawMessage
+            )
             val jsonBody = JSONObject().apply {
                 put("sender", eventDto.sender ?: "")
                 put("body", eventDto.rawMessage)
