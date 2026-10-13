@@ -4,6 +4,7 @@ import com.example.domain.model.WalletType
 import com.example.domain.parser.FloosakParser
 import com.example.domain.parser.JawaliParser
 import com.example.domain.parser.JeebParser
+import com.example.domain.parser.ParserRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -78,4 +79,38 @@ class WalletParserRealSmsTest {
         assertFalse(p.isFinancialTransfer)
         assertEquals(null, p.amount)
     }
+    @Test
+    fun jawaliPurchaseWithoutLeadingLaqadAndWithRiyalCurrencyIsParsed() {
+        val p = JawaliParser().parse(
+            "sms-jawali-variant",
+            "6006",
+            "استلمت YER 16000 كقيمة مشتريات بمرجع 468486397181 من عميد محمد احمد احمد",
+            1000L
+        )
+        assertEquals(16000.0, p.amount)
+        assertEquals("468486397181", p.transactionId)
+        assertEquals("عميد محمد احمد احمد", p.sender)
+        assertTrue(p.isFinancialTransfer)
+    }
+
+    @Test
+    fun registryRecognizesAllThreeTemplatesEvenWithNumericOriginSender() {
+        val registry = ParserRegistry()
+        assertTrue(registry.findParser(
+            "6006",
+            "اضيف 5000 ر.ي تحويل مشترك رص:72758.47ر.ي من عبدالله الجميلي-77366225",
+            WalletType.UNKNOWN
+        ) is JeebParser)
+        assertTrue(registry.findParser(
+            "6007",
+            "استلمت حوالة من حاشد بزدان بمبلغ 800.00 ر.ي رصيدك 1500.00 ر.ي",
+            WalletType.UNKNOWN
+        ) is FloosakParser)
+        assertTrue(registry.findParser(
+            "6008",
+            "استلمت YER 16000 كقيمة مشتريات بمرجع 468486397181 من عميد محمد احمد احمد",
+            WalletType.UNKNOWN
+        ) is JawaliParser)
+    }
+
 }
