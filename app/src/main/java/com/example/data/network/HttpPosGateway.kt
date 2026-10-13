@@ -135,20 +135,11 @@ class HttpPosGateway(
             try {
                 client.newCall(request).execute().use { response ->
                     val respBody = response.body?.string()
-                    if (response.isSuccessful) {
-                        PosAckResponse(
-                            isSuccess = true,
-                            httpStatusCode = response.code,
-                            rawResponse = respBody
-                        )
-                    } else {
-                        PosAckResponse(
-                            isSuccess = false,
-                            httpStatusCode = response.code,
-                            rawResponse = respBody,
-                            errorMessage = "POS HTTP error: ${response.code} ${response.message}"
-                        )
-                    }
+                    PosAcknowledgementParser.parse(
+                        httpStatusCode = response.code,
+                        responseBody = respBody,
+                        httpMessage = response.message
+                    )
                 }
             } catch (e: IOException) {
                 PosAckResponse(
