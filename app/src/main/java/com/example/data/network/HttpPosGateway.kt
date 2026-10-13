@@ -35,7 +35,9 @@ class HttpPosGateway(
         val config = configDao.getConfig() ?: return@withContext false
         val token = GatewaySecretStore.decrypt(context, config.gatewayToken)
         val deviceId = config.deviceId.trim()
-        if (token.length < 32 || deviceId.isBlank() || config.posIpAddress.isBlank()) {
+        if (token.length < 32 || deviceId.isBlank() || config.posIpAddress.isBlank() ||
+            !LocalNetworkHostPolicy.isAllowedCleartextHost(config.posIpAddress)
+        ) {
             return@withContext false
         }
 
@@ -82,6 +84,13 @@ class HttpPosGateway(
                     isSuccess = false,
                     httpStatusCode = null,
                     errorMessage = "A POS address, authorized device ID, stable event ID, and 32+ character HMAC key are required"
+                )
+            }
+            if (!LocalNetworkHostPolicy.isAllowedCleartextHost(ip)) {
+                return@withContext PosAckResponse(
+                    isSuccess = false,
+                    httpStatusCode = null,
+                    errorMessage = "Cleartext POS communication is restricted to a private local-network host"
                 )
             }
 
