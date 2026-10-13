@@ -11,6 +11,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 object GatewaySecretStore {
     const val MIN_TOKEN_LENGTH = 32
+    const val ENCRYPTED_PREFIX = "pf-gcm:v1:"
     private const val KEYSTORE = "AndroidKeyStore"
     private const val ALIAS = "POWER_FEUL_GATEWAY_TOKEN"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -40,13 +41,14 @@ object GatewaySecretStore {
         cipher.init(Cipher.ENCRYPT_MODE, key())
         val iv = cipher.iv
         val encrypted = cipher.doFinal(value.toByteArray(StandardCharsets.UTF_8))
-        return Base64.encodeToString(iv + encrypted, Base64.NO_WRAP)
+        return ENCRYPTED_PREFIX + Base64.encodeToString(iv + encrypted, Base64.NO_WRAP)
     }
 
     fun decrypt(context: Context, value: String): String {
         if (value.isBlank()) return ""
         return try {
-            val data = Base64.decode(value, Base64.NO_WRAP)
+            val encoded = if (value.startsWith(ENCRYPTED_PREFIX)) value.removePrefix(ENCRYPTED_PREFIX) else value
+            val data = Base64.decode(encoded, Base64.NO_WRAP)
             require(data.size > 12)
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, data.copyOfRange(0, 12)))

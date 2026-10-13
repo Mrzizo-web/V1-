@@ -1,5 +1,8 @@
 package com.example.data.network
 
+import java.net.Inet6Address
+import java.net.InetAddress
+
 /**
  * HTTP is used only for the local POS gateway. HMAC protects request authenticity
  * and integrity; this allowlist prevents a misconfigured IP field from sending
@@ -8,22 +11,23 @@ package com.example.data.network
 object LocalNetworkHostPolicy {
     fun isAllowedCleartextHost(host: String): Boolean {
         val normalized = host.trim().removePrefix("[").removeSuffix("]").lowercase()
-        if (normalized == "localhost" || normalized.endsWith(".localhost") ||
-            normalized == "::1" || normalized.startsWith("127.")
-        ) return true
+        if (normalized == "localhost" || normalized.endsWith(".localhost")) return true
 
         if (normalized.contains(":")) {
-            // IPv6 unique-local, loopback, and link-local ranges.
-            return normalized == "::1" ||
-                normalized.startsWith("fc") ||
-                normalized.startsWith("fd") ||
-                normalized.startsWith("fe80:")
+            // Parse the complete IPv6 literal before allowing its local/private range.
+            if (normalized.any { !(it in '0'..'9' || it in 'a'..'f' || it == ':' || it == '.' || it == '%') }) return false
+            val address = runCatching { InetAddress.getByName(normalized) }.getOrNull() as? Inet6Address
+                ?: return false
+            val firstByte = address.address[0].toInt() and 0xff
+            return address.isLoopbackAddress || address.isLinkLocalAddress || (firstByte and 0xfe) == 0xfc
         }
 
-        val octets = normalized.split(".").map { it.toIntOrNull() ?: return false }
-        if (octets.size != 4 || octets.any { it !in 0..255 }) return false
-        val a = octets[0]
-        val b = octets[1]
+        val octets = normalized.split(".")
+        if (octets.size != 4 || octets.any { it.isEmpty() || it.any { char -> char !in '0'..'9' } }) return false
+        val numbers = octets.map { it.toIntOrNull() ?: return false }
+        if (numbers.any { it !in 0..255 }) return false
+        val a = numbers[0]
+        val b = numbers[1]
         return a == 10 ||
             (a == 172 && b in 16..31) ||
             (a == 192 && b == 168) ||
