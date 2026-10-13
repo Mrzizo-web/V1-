@@ -6,7 +6,6 @@ import android.content.Context
 import com.example.security.GatewaySecretStore
 import com.example.security.AdminPinHasher
 import java.security.MessageDigest
-import android.util.Base64
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -21,22 +20,21 @@ class GatewayConfigRepository(
             configDao.insertOrUpdate(it)
         }
         val storedToken = current.gatewayToken
-        if (storedToken.isBlank() || GatewaySecretStore.decrypt(context, storedToken).isNotBlank()) {
-            return current
-        }
+        if (storedToken.isBlank()) return current
 
-        // Migrate legacy plaintext tokens of any supported length. Encoded legacy
-        // ciphertext candidates (12-byte IV + at least a GCM tag, 60+ decoded bytes)
-        // remain untouched if they cannot be decrypted, so an invalidated Keystore
-        // record is never silently re-encrypted as though it were a new secret.
-        if (storedToken.length < GatewaySecretStore.MIN_TOKEN_LENGTH) return current
-        val decodedSize = runCatching {
-            Base64.decode(storedToken, Base64.NO_WRAP).size
-        }.getOrNull()
-        if (decodedSize != null && decodedSize >= 60) return current
+        // New ciphertext is explicitly versioned. This avoids misclassifying a long
+        // plaintext token made of Base64 characters as an already-encrypted token.
+        if (storedToken.startsWith(GatewaySecretStore.ENCRYPTED_PREFIX)) return current
+
+        // Existing unversioned ciphertext can still be migrated when the current
+        // Android Keystore key can decrypt it. All other legacy values are treated
+        // as plaintext and encrypted, rather than guessed from encoded length.
+        val legacyDecrypted = GatewaySecretStore.decrypt(context, storedToken)
+        val plaintext = if (legacyDecrypted.isNotBlank()) legacyDecrypted else storedToken
+        if (plaintext.length < GatewaySecretStore.MIN_TOKEN_LENGTH) return current
 
         val encrypted = runCatching {
-            GatewaySecretStore.encrypt(context, storedToken)
+            GatewaySecretStore.encrypt(context, plaintext)
         }.getOrNull()?.takeIf { it.isNotBlank() } ?: return current
         val migrated = current.copy(gatewayToken = encrypted)
         configDao.insertOrUpdate(migrated)
