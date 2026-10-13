@@ -33,14 +33,14 @@ interface PaymentDao {
      */
     @Query("""
         SELECT * FROM payments 
-        WHERE status IN ('QUEUED', 'FAILED', 'SENT', 'NEEDS_REVIEW') 
+        WHERE status IN ('QUEUED', 'FAILED', 'SENT') 
         ORDER BY receivedAt ASC
     """)
     suspend fun getPendingSyncPayments(): List<PaymentEntity>
 
     @Query("""
         SELECT * FROM payments 
-        WHERE status IN ('QUEUED', 'FAILED', 'NEEDS_REVIEW') 
+        WHERE status IN ('QUEUED', 'FAILED', 'SENT') 
         ORDER BY receivedAt ASC
     """)
     fun observePendingSyncPayments(): Flow<List<PaymentEntity>>

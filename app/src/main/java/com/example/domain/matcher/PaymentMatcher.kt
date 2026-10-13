@@ -32,10 +32,12 @@ class PaymentMatcher(private val paymentDao: PaymentDao) {
         val amount = candidate.amount
         val valid = candidate.isFinancialTransfer && amount != null && amount > 0.0
         val paymentId = UUID.randomUUID().toString()
-        val status = if (valid && !candidate.transactionId.isNullOrBlank() && candidate.confidence >= 0.6f) PaymentStatus.QUEUED else PaymentStatus.NEEDS_REVIEW
+        val status = if (valid && candidate.confidence >= 0.6f) PaymentStatus.QUEUED else PaymentStatus.NEEDS_REVIEW
         val reason = when {
-            !valid -> "Missing or unparseable financial amount; human review required"
-            candidate.transactionId.isNullOrBlank() -> "No transaction/reference ID; never auto-merged and flagged for review"
+            !valid -> "Missing or unparseable incoming financial amount; human review required"
+            candidate.confidence < 0.6f -> "Parser confidence below the automatic-transfer threshold; human review required"
+            candidate.transactionId.isNullOrBlank() ->
+                "Verified incoming transfer has no reference ID; use the stable SMS event ID and never merge by amount, sender, or time"
             else -> "New unique transaction detected"
         }
         val payment = PaymentEntity(

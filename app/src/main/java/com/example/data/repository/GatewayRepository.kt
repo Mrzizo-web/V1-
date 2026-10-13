@@ -39,10 +39,11 @@ class GatewayRepository(
 ) {
 
     private val paymentMatcher = PaymentMatcher(paymentDao)
+    private val processingMutex = Mutex()
     private val syncMutex = Mutex()
-    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ENGLISH)
 
-    private fun formatTime(millis: Long): String = timeFormat.format(Date(millis))
+    private fun formatTime(millis: Long): String =
+        SimpleDateFormat("HH:mm:ss", Locale.ENGLISH).format(Date(millis))
 
     suspend fun logEvent(tag: String, message: String, level: String = "INFO", details: String? = null) {
         val entity = EventLogEntity(
@@ -65,11 +66,12 @@ class GatewayRepository(
         body: String,
         receivedAt: Long = System.currentTimeMillis()
     ): ProcessSmsResult = withContext(Dispatchers.IO) {
+        processingMutex.withLock {
         val timeStr = formatTime(receivedAt)
         val existingSms = smsMessageDao.getMessageById(smsId)
-        if (existingSms != null) {
+        if (existingSms != null && existingSms.processingStatus != SmsProcessingStatus.PENDING) {
             logEvent("SMS_DUPLICATE", "$timeStr Duplicate SMS ignored: $smsId", level = "WARN", details = body)
-            return@withContext ProcessSmsResult(smsId, existingSms.paymentId, PaymentStatus.DUPLICATE, "Duplicate SMS ignored")
+            return@withLock ProcessSmsResult(smsId, existingSms.paymentId, PaymentStatus.DUPLICATE, "Duplicate SMS ignored")
         }
         logEvent("SMS_RECEIVED", "$timeStr SMS RECEIVED from $sender", level = "INFO", details = body)
 
@@ -82,7 +84,8 @@ class GatewayRepository(
         )
 
         // Store raw SMS initially
-        val rawSms = SmsMessageEntity(
+        // Reuse an interrupted PENDING row so a process restart can finish parsing it.
+        val rawSms = existingSms ?: SmsMessageEntity(
             smsId = smsId,
             receivedAt = receivedAt,
             sender = sender,
@@ -94,7 +97,16 @@ class GatewayRepository(
             paymentId = null,
             processingStatus = SmsProcessingStatus.PENDING
         )
-        smsMessageDao.insertMessage(rawSms)
+        if (existingSms == null && smsMessageDao.insertMessage(rawSms) == -1L) {
+            val racedSms = smsMessageDao.getMessageById(smsId)
+            logEvent("SMS_DUPLICATE", "$timeStr Concurrent duplicate SMS ignored: $smsId", level = "WARN")
+            return@withLock ProcessSmsResult(
+                smsId,
+                racedSms?.paymentId,
+                PaymentStatus.DUPLICATE,
+                "Concurrent duplicate SMS ignored"
+            )
+        }
 
         // Retrieve Parser
         val parser = parserRegistry.findParser(sender, body, detectedWallet)
@@ -189,10 +201,8 @@ class GatewayRepository(
                 logEvent("PAYMENT_CREATED", "$timeStr PAYMENT CREATED: ID=${payment.paymentId.take(8)}", level = "SUCCESS")
                 logEvent("STATUS", "$timeStr Status: ${matchOutcome.initialStatus.name}", level = "INFO")
 
-                // If queued, trigger background sync
-                if (matchOutcome.initialStatus == PaymentStatus.QUEUED || matchOutcome.initialStatus == PaymentStatus.NEEDS_REVIEW) {
-                    syncSinglePayment(payment)
-                }
+                // Persist only. The foreground service drains QUEUED work off the
+                // BroadcastReceiver path so a slow Wi-Fi request cannot expire goAsync().
 
                 ProcessSmsResult(
                     smsId = smsId,
@@ -202,6 +212,7 @@ class GatewayRepository(
                 )
             }
         }
+        }
     }
 
     /**
@@ -209,44 +220,77 @@ class GatewayRepository(
      * If POS is offline, it leaves it in QUEUED / FAILED for offline sync.
      */
     suspend fun syncSinglePayment(payment: PaymentEntity): Boolean = withContext(Dispatchers.IO) {
+        syncMutex.withLock { syncSinglePaymentLocked(payment) }
+    }
+
+    private suspend fun syncSinglePaymentLocked(payment: PaymentEntity): Boolean {
+        val current = paymentDao.getPaymentById(payment.paymentId) ?: return false
+        if (current.status == PaymentStatus.ACKNOWLEDGED || current.status == PaymentStatus.DUPLICATE) {
+            return true
+        }
+        if (current.status == PaymentStatus.NEEDS_REVIEW) {
+            logEvent("SYNC_BLOCKED_REVIEW",
+                "Payment \${current.paymentId.take(8)} requires human review and will not be sent to POS",
+                level = "WARN")
+            return false
+        }
+        if (current.status !in setOf(PaymentStatus.QUEUED, PaymentStatus.FAILED, PaymentStatus.SENT)) {
+            return false
+        }
+        if (!current.amount.isFinite() || current.amount <= 0.0 ||
+            current.wallet == WalletType.UNKNOWN || current.confidence < 0.6f ||
+            current.initialSmsId.isBlank()
+        ) {
+            val held = current.copy(
+                status = PaymentStatus.NEEDS_REVIEW,
+                updatedAt = System.currentTimeMillis(),
+                syncErrorMessage = "Invalid or low-confidence payment held for manual review"
+            )
+            paymentDao.updatePayment(held)
+            logEvent("SYNC_BLOCKED_INVALID",
+                "Payment \${current.paymentId.take(8)} moved to manual review before transmission",
+                level = "WARN")
+            return false
+        }
+
         val config = gatewayConfigDao.getConfig()
         if (config?.isGatewayActive == false) {
             logEvent("SYNC_SKIPPED", "Gateway is inactive, payment kept in queue", level = "WARN")
-            return@withContext false
+            return false
         }
 
         val timeStr = formatTime(System.currentTimeMillis())
-        logEvent("SENDING", "$timeStr SENDING TO POS: ${payment.amount} YER (ID: ${payment.paymentId.take(8)})", level = "INFO")
+        logEvent("SENDING", "\$timeStr SENDING TO POS: \${current.amount} YER (ID: \${current.paymentId.take(8)})", level = "INFO")
 
-        val eventId = payment.paymentId
-        val result = posGateway.sendPayment(payment, eventId)
-
-        // Record attempt
+        // Payment ID is the durable idempotency key and remains unchanged on retry.
+        val eventId = current.paymentId
+        val result = posGateway.sendPayment(current, eventId)
         paymentAttemptDao.insertAttempt(
             PaymentAttemptEntity(
-                paymentId = payment.paymentId,
+                paymentId = current.paymentId,
                 attemptedAt = System.currentTimeMillis(),
                 isSuccess = result.isSuccess,
                 httpStatusCode = result.httpStatusCode,
-                endpoint = "http://${config?.posIpAddress ?: "unknown"}:${config?.posPort ?: 8080}",
+                endpoint = "http://\${config?.posIpAddress ?: "unknown"}:\${config?.posPort ?: 8080}",
                 responseBody = result.rawResponse,
                 errorMessage = result.errorMessage
             )
         )
 
         if (result.isSuccess) {
-            paymentDao.updateStatus(payment.paymentId, PaymentStatus.ACKNOWLEDGED)
-            logEvent("ACKNOWLEDGED", "$timeStr ACKNOWLEDGED by POS for payment ${payment.paymentId.take(8)}", level = "SUCCESS")
+            paymentDao.updateStatus(current.paymentId, PaymentStatus.ACKNOWLEDGED)
+            logEvent("ACKNOWLEDGED", "\$timeStr ACKNOWLEDGED by POS for payment \${current.paymentId.take(8)}", level = "SUCCESS")
             true
         } else {
-            val updated = payment.copy(
+            val updated = current.copy(
                 status = PaymentStatus.FAILED,
-                retryCount = payment.retryCount + 1,
+                retryCount = current.retryCount + 1,
                 lastSyncAttemptAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
                 syncErrorMessage = result.errorMessage
             )
             paymentDao.updatePayment(updated)
-            logEvent("SYNC_FAILED", "$timeStr FAILED: ${result.errorMessage ?: "POS unreachable"}. In offline queue.", level = "ERROR")
+            logEvent("SYNC_FAILED", "\$timeStr FAILED: \${result.errorMessage ?: "POS unreachable"}. In offline queue.", level = "ERROR")
             false
         }
     }
@@ -262,7 +306,7 @@ class GatewayRepository(
 
             var successfulCount = 0
             for (payment in pending) {
-                val ok = syncSinglePayment(payment)
+                val ok = syncSinglePaymentLocked(payment)
                 if (ok) successfulCount++
             }
             successfulCount
