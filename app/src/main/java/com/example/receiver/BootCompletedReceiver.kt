@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.GatewayApplication
-import com.example.service.GatewayForegroundService
+import com.example.worker.GatewaySyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,15 +25,15 @@ class BootCompletedReceiver : BroadcastReceiver() {
                         level = "WARN"
                     )
 
-                    // Start background foreground service if configured
+                    // WorkManager is reboot-persistent and allowed from BOOT_COMPLETED;
+                    // Android 15+ restricts starting dataSync foreground services here.
+                    GatewaySyncScheduler.schedulePeriodic(context)
                     val config = app.configRepository.getCurrentConfig()
-                    if (config.isGatewayActive) {
-                        GatewayForegroundService.startService(context)
-                        // The foreground service owns queue recovery/sync. Avoid a second
-                        // network worker inside goAsync(), which can outlive the boot broadcast.
+                    if (config.isGatewayActive && config.isAutoSyncEnabled) {
+                        GatewaySyncScheduler.enqueueImmediate(context)
                     }
                 } catch (e: Exception) {
-                    app.repository.logEvent("BOOT_RECOVERY_ERROR", "Error during boot recovery: ${e.message}", level = "ERROR")
+                    app.repository.logEvent("BOOT_RECOVERY_ERROR", "Background work could not be scheduled after reboot", level = "ERROR")
                 } finally {
                     pendingResult.finish()
                 }
