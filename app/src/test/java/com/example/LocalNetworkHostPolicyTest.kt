@@ -38,6 +38,8 @@ class LocalNetworkHostPolicyTest {
             "127.0.0.1.attacker.example",
             "127.evil",
             "fd:not-an-ip",
+            "fdnotipv6:aa:bb",
+            "１２７.０.０.１",
             "http://192.168.1.10",
             ""
         ).forEach { host ->
