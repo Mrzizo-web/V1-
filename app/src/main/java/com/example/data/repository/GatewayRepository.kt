@@ -304,7 +304,22 @@ class GatewayRepository(
      */
     suspend fun syncPendingPayments(): Int = withContext(Dispatchers.IO) {
         syncMutex.withLock {
-            val pending = paymentDao.getPendingSyncPayments()
+            val config = gatewayConfigDao.getConfig()
+            if (config?.isGatewayActive == false) return@withLock 0
+
+            val now = System.currentTimeMillis()
+            val maxAttempts = (config?.maxRetryCount ?: 5).coerceAtLeast(1)
+            val retryDelayMillis = (config?.retryDelaySeconds ?: 15).coerceAtLeast(1) * 1000L
+            val pending = paymentDao.getPendingSyncPayments().filter { payment ->
+                when (payment.status) {
+                    PaymentStatus.QUEUED -> true
+                    PaymentStatus.FAILED, PaymentStatus.SENT ->
+                        payment.retryCount < maxAttempts &&
+                            (payment.lastSyncAttemptAt == null ||
+                                now - payment.lastSyncAttemptAt >= retryDelayMillis)
+                    else -> false
+                }
+            }
             if (pending.isEmpty()) return@withLock 0
 
             var successfulCount = 0

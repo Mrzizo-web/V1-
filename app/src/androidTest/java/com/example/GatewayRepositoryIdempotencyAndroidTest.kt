@@ -3,6 +3,7 @@ package com.example
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.data.local.AppDatabase
+import com.example.data.local.entity.GatewayConfigEntity
 import com.example.data.local.entity.PaymentEntity
 import com.example.data.local.entity.SmsMessageEntity
 import com.example.data.network.PosGateway
@@ -152,17 +153,75 @@ class GatewayRepositoryIdempotencyAndroidTest {
         assertEquals(1, pos.sentEventIds.size)
     }
 
+
+    @Test
+    fun retryDelayPreventsImmediateRepeatedSend() = runBlocking {
+        db.gatewayConfigDao().insertOrUpdate(
+            GatewayConfigEntity(maxRetryCount = 3, retryDelaySeconds = 300)
+        )
+        pos.nextSuccess = false
+        repository.processIncomingSms(
+            smsId = "retry-delay-sms",
+            sender = "JEEB",
+            body = incomingJeeb,
+            receivedAt = System.currentTimeMillis()
+        )
+
+        assertEquals(0, repository.syncPendingPayments())
+        val failed = db.paymentDao().getAllPayments().first().single()
+        assertEquals(PaymentStatus.FAILED, failed.status)
+        assertEquals(1, pos.sentEventIds.size)
+
+        pos.nextSuccess = true
+        assertEquals(0, repository.syncPendingPayments())
+        assertEquals("Automatic retry must respect retryDelaySeconds", 1, pos.sentEventIds.size)
+
+        db.paymentDao().updatePayment(
+            failed.copy(lastSyncAttemptAt = System.currentTimeMillis() - 301_000L)
+        )
+        assertEquals(1, repository.syncPendingPayments())
+        assertEquals(2, pos.sentEventIds.size)
+        assertEquals(PaymentStatus.ACKNOWLEDGED, db.paymentDao().getAllPayments().first().single().status)
+    }
+
+    @Test
+    fun maxRetryCountStopsAutomaticAttemptsButKeepsFailedPaymentVisible() = runBlocking {
+        db.gatewayConfigDao().insertOrUpdate(
+            GatewayConfigEntity(maxRetryCount = 1, retryDelaySeconds = 1)
+        )
+        pos.nextSuccess = false
+        repository.processIncomingSms(
+            smsId = "retry-limit-sms",
+            sender = "JEEB",
+            body = incomingJeeb,
+            receivedAt = System.currentTimeMillis()
+        )
+
+        assertEquals(0, repository.syncPendingPayments())
+        assertEquals(1, pos.sentEventIds.size)
+        val failed = db.paymentDao().getAllPayments().first().single()
+        assertEquals(PaymentStatus.FAILED, failed.status)
+        assertEquals(1, failed.retryCount)
+
+        pos.nextSuccess = true
+        assertEquals(0, repository.syncPendingPayments())
+        assertEquals("The configured automatic retry limit must be enforced", 1, pos.sentEventIds.size)
+        assertEquals(PaymentStatus.FAILED, db.paymentDao().getAllPayments().first().single().status)
+    }
+
     private class RecordingPosGateway : PosGateway {
         val sentEventIds = Collections.synchronizedList(mutableListOf<String>())
+        @Volatile var nextSuccess: Boolean = true
 
         override suspend fun checkConnection(): Boolean = true
 
         override suspend fun sendPayment(payment: PaymentEntity, eventId: String): PosAckResponse {
             sentEventIds.add(eventId)
             return PosAckResponse(
-                isSuccess = true,
-                httpStatusCode = 200,
-                rawResponse = """{"success":true,"result":"CREATED"}"""
+                isSuccess = nextSuccess,
+                httpStatusCode = if (nextSuccess) 200 else 503,
+                rawResponse = if (nextSuccess) """{"success":true,"result":"CREATED"}""" else null,
+                errorMessage = if (nextSuccess) null else "POS unreachable"
             )
         }
     }
