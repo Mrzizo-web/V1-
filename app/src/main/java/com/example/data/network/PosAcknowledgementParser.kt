@@ -56,7 +56,8 @@ internal object PosAcknowledgementParser {
             isSuccess = false,
             httpStatusCode = httpStatusCode,
             rawResponse = responseBody,
-            errorMessage = reason
+            errorMessage = reason,
+            requiresReview = result == "UNMATCHED"
         )
     }
 }
