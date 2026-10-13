@@ -300,4 +300,42 @@ class GatewayRepositoryIdempotencyAndroidTest {
             )
         }
     }
+    @Test
+    fun sameJawaliReferenceAndAmountIsLinkedAsDuplicate() = runBlocking {
+        val body = "استلمت YER 100 كقيمة مشتريات بمرجع 123456789 من عميل اختبار"
+        repository.processIncomingSms("jawali-ref-one", "JAWALI", body, 1_800_000_000_000L)
+        val duplicate = repository.processIncomingSms(
+            "jawali-ref-two", "JAWALI", body, 1_800_000_001_000L
+        )
+
+        assertEquals(PaymentStatus.DUPLICATE, duplicate.status)
+        assertEquals(1, db.paymentDao().getAllPayments().first().size)
+        assertEquals(2, db.smsMessageDao().getAllMessages().first().size)
+    }
+
+    @Test
+    fun sameJawaliReferenceWithDifferentAmountIsHeldForManualReview() = runBlocking {
+        val firstBody = "استلمت YER 100 كقيمة مشتريات بمرجع 123456789 من عميل اختبار"
+        val conflictingBody = "استلمت YER 200 كقيمة مشتريات بمرجع 123456789 من عميل اختبار"
+        repository.processIncomingSms("jawali-conflict-one", "JAWALI", firstBody, 1_800_000_000_000L)
+        val conflict = repository.processIncomingSms(
+            "jawali-conflict-two", "JAWALI", conflictingBody, 1_800_000_001_000L
+        )
+
+        assertEquals(PaymentStatus.NEEDS_REVIEW, conflict.status)
+        val payments = db.paymentDao().getAllPayments().first()
+        assertEquals(2, payments.size)
+        assertEquals(PaymentStatus.QUEUED, payments.first { it.initialSmsId == "jawali-conflict-one" }.status)
+        val reviewPayment = payments.first { it.initialSmsId == "jawali-conflict-two" }
+        assertEquals(PaymentStatus.NEEDS_REVIEW, reviewPayment.status)
+        assertEquals(null, reviewPayment.transactionId)
+        assertTrue(reviewPayment.syncErrorMessage!!.contains("123456789"))
+
+        repository.syncPendingPayments()
+        assertEquals("Only the validated original event may be transmitted", 1, pos.sentEventIds.size)
+        assertEquals(PaymentStatus.NEEDS_REVIEW,
+            db.paymentDao().getAllPayments().first().first { it.initialSmsId == "jawali-conflict-two" }.status)
+    }
+
+
 }
