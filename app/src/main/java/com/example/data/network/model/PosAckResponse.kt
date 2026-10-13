@@ -5,5 +5,6 @@ data class PosAckResponse(
     val httpStatusCode: Int?,
     val receiptId: String? = null,
     val rawResponse: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val requiresReview: Boolean = false
 )
