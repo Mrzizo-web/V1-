@@ -230,7 +230,7 @@ class GatewayRepository(
         }
         if (current.status == PaymentStatus.NEEDS_REVIEW) {
             logEvent("SYNC_BLOCKED_REVIEW",
-                "Payment \${current.paymentId.take(8)} requires human review and will not be sent to POS",
+                "Payment ${current.paymentId.take(8)} requires human review and will not be sent to POS",
                 level = "WARN")
             return false
         }
@@ -248,7 +248,7 @@ class GatewayRepository(
             )
             paymentDao.updatePayment(held)
             logEvent("SYNC_BLOCKED_INVALID",
-                "Payment \${current.paymentId.take(8)} moved to manual review before transmission",
+                "Payment ${current.paymentId.take(8)} moved to manual review before transmission",
                 level = "WARN")
             return false
         }
@@ -260,7 +260,7 @@ class GatewayRepository(
         }
 
         val timeStr = formatTime(System.currentTimeMillis())
-        logEvent("SENDING", "\$timeStr SENDING TO POS: \${current.amount} YER (ID: \${current.paymentId.take(8)})", level = "INFO")
+        logEvent("SENDING", "\$timeStr SENDING TO POS: ${current.amount} YER (ID: ${current.paymentId.take(8)})", level = "INFO")
 
         // Payment ID is the durable idempotency key and remains unchanged on retry.
         val eventId = current.paymentId
@@ -271,7 +271,7 @@ class GatewayRepository(
                 attemptedAt = System.currentTimeMillis(),
                 isSuccess = result.isSuccess,
                 httpStatusCode = result.httpStatusCode,
-                endpoint = "http://\${config?.posIpAddress ?: "unknown"}:\${config?.posPort ?: 8080}",
+                endpoint = "http://${config?.posIpAddress ?: "unknown"}:${config?.posPort ?: 8080}",
                 responseBody = result.rawResponse,
                 errorMessage = result.errorMessage
             )
@@ -279,7 +279,7 @@ class GatewayRepository(
 
         if (result.isSuccess) {
             paymentDao.updateStatus(current.paymentId, PaymentStatus.ACKNOWLEDGED)
-            logEvent("ACKNOWLEDGED", "\$timeStr ACKNOWLEDGED by POS for payment \${current.paymentId.take(8)}", level = "SUCCESS")
+            logEvent("ACKNOWLEDGED", "\$timeStr ACKNOWLEDGED by POS for payment ${current.paymentId.take(8)}", level = "SUCCESS")
             true
         } else {
             val updated = current.copy(
@@ -290,7 +290,7 @@ class GatewayRepository(
                 syncErrorMessage = result.errorMessage
             )
             paymentDao.updatePayment(updated)
-            logEvent("SYNC_FAILED", "\$timeStr FAILED: \${result.errorMessage ?: "POS unreachable"}. In offline queue.", level = "ERROR")
+            logEvent("SYNC_FAILED", "\$timeStr FAILED: ${result.errorMessage ?: "POS unreachable"}. In offline queue.", level = "ERROR")
             false
         }
     }
