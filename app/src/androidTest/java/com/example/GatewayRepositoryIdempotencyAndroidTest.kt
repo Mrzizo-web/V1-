@@ -145,8 +145,8 @@ class GatewayRepositoryIdempotencyAndroidTest {
             )
         )
 
-        val result = repository.processIncomingSms(smsId, "JEEB", incomingJeeb, now)
-        assertEquals(PaymentStatus.QUEUED, result.status)
+        assertEquals(1, repository.recoverPendingSms())
+        assertEquals(PaymentStatus.QUEUED, db.paymentDao().getPaymentByInitialSmsId(smsId)!!.status)
         assertEquals(SmsProcessingStatus.PROCESSED, db.smsMessageDao().getMessageById(smsId)!!.processingStatus)
         assertEquals(1, db.paymentDao().getAllPayments().first().size)
 
@@ -246,8 +246,8 @@ class GatewayRepositoryIdempotencyAndroidTest {
         )
         db.paymentDao().insertPayment(existingPayment)
 
-        val result = repository.processIncomingSms(smsId, "JEEB", incomingJeeb, now)
-        assertEquals("already-created-payment", result.paymentId)
+        assertEquals(1, repository.recoverPendingSms())
+        assertEquals("already-created-payment", db.smsMessageDao().getMessageById(smsId)!!.paymentId)
         assertEquals(1, db.paymentDao().getAllPayments().first().size)
         assertEquals("already-created-payment", db.smsMessageDao().getMessageById(smsId)!!.paymentId)
 

@@ -59,12 +59,16 @@ class GatewayForegroundService : Service {
         syncJob = serviceScope.launch {
             while (isActive) {
                 try {
+                    val recoveredCount = app.repository.recoverPendingSms()
                     val config = app.configRepository.getCurrentConfig()
+                    var syncedCount = 0
                     if (config.isGatewayActive && config.isAutoSyncEnabled) {
-                        val syncedCount = app.repository.syncPendingPayments()
-                        if (syncedCount > 0) {
-                            updateNotification("تمت مزامنة $syncedCount حوالة بنجاح")
-                        }
+                        syncedCount = app.repository.syncPendingPayments()
+                    }
+                    if (recoveredCount > 0 || syncedCount > 0) {
+                        updateNotification(
+                            "استعادة $recoveredCount رسالة معلّقة؛ مزامنة $syncedCount حوالة"
+                        )
                     }
                 } catch (_: Exception) {
                     // Ignored in loop

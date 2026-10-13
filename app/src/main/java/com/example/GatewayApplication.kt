@@ -52,6 +52,15 @@ class GatewayApplication : Application() {
 
         // Boot logging and auto service start
         CoroutineScope(Dispatchers.IO).launch {
+            try {
+                repository.recoverPendingSms()
+            } catch (error: Exception) {
+                repository.logEvent(
+                    tag = "SMS_RECOVERY_STARTUP_ERROR",
+                    message = "Could not recover pending SMS after app startup: " + error.message,
+                    level = "ERROR"
+                )
+            }
             val config = configRepository.getCurrentConfig()
             walletDetector.updateKeywords(
                 config.jeebSenderKeyword,

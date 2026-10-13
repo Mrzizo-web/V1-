@@ -57,6 +57,39 @@ class GatewayRepository(
     }
 
     /**
+     * Re-process locally persisted SMS rows left PENDING by process death or an
+     * interrupted receiver. The same processing mutex protects each row, and
+     * interrupted payment/SMS linkage is repaired without creating duplicates.
+     */
+    suspend fun recoverPendingSms(): Int = withContext(Dispatchers.IO) {
+        val pending = smsMessageDao.getPendingMessagesForRecovery()
+        var recovered = 0
+        for (sms in pending) {
+            try {
+                processIncomingSms(
+                    smsId = sms.smsId,
+                    sender = sms.sender,
+                    body = sms.body,
+                    receivedAt = sms.receivedAt
+                )
+                val after = smsMessageDao.getMessageById(sms.smsId)
+                if (after != null && after.processingStatus != SmsProcessingStatus.PENDING) {
+                    recovered++
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                logEvent(
+                    "SMS_RECOVERY_FAILED",
+                    "Could not recover pending SMS " + sms.smsId.take(12) + ": " + (error.message ?: "unknown error"),
+                    level = "ERROR"
+                )
+            }
+        }
+        recovered
+    }
+
+    /**
      * Primary entry point when an SMS is intercepted or simulated.
      * Transaction-safe, deduplicating, and idempotent.
      */

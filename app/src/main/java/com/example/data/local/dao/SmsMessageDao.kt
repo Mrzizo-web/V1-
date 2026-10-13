@@ -26,6 +26,9 @@ interface SmsMessageDao {
     @Query("SELECT * FROM sms_messages WHERE smsId = :smsId LIMIT 1")
     suspend fun getMessageById(smsId: String): SmsMessageEntity?
 
+    @Query("SELECT * FROM sms_messages WHERE processingStatus = 'PENDING' ORDER BY receivedAt ASC LIMIT 100")
+    suspend fun getPendingMessagesForRecovery(): List<SmsMessageEntity>
+
     @Query("SELECT * FROM sms_messages WHERE parsedTransactionId = :txId LIMIT 1")
     suspend fun findByTransactionId(txId: String): SmsMessageEntity?
 
