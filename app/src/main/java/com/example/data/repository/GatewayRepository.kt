@@ -114,7 +114,7 @@ class GatewayRepository(
             val updatedSms = rawSms.copy(processingStatus = SmsProcessingStatus.NEEDS_REVIEW)
             smsMessageDao.updateMessage(updatedSms)
             logEvent("PARSER", "$timeStr No parser matched for wallet $detectedWallet", level = "WARN")
-            return@withContext ProcessSmsResult(
+            return@withLock ProcessSmsResult(
                 smsId = smsId,
                 paymentId = null,
                 status = PaymentStatus.NEEDS_REVIEW,
@@ -133,7 +133,7 @@ class GatewayRepository(
             )
             smsMessageDao.updateMessage(updatedSms)
             logEvent("IGNORED", "$timeStr Non-transfer SMS ignored (OTP or informational)", level = "INFO")
-            return@withContext ProcessSmsResult(
+            return@withLock ProcessSmsResult(
                 smsId = smsId,
                 paymentId = null,
                 status = PaymentStatus.RECEIVED_SMS,
@@ -152,7 +152,7 @@ class GatewayRepository(
         // Multi-SMS Matching and Deduplication
         val matchOutcome = paymentMatcher.matchCandidate(candidate)
 
-        return@withContext when (matchOutcome) {
+        when (matchOutcome) {
             is MatchOutcome.LinkToExisting -> {
                 val existing = matchOutcome.existingPayment
                 // Increment message count for existing payment
