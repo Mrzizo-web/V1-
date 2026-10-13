@@ -6,6 +6,10 @@ import com.example.domain.model.WalletType
 class FloosakParser : BaseWalletParser(WalletType.FLOOSAK, parserVersion = "2.0-floosak-real") {
     override val supportedSenders: List<String> = listOf("FLOOSAK", "فلوسك", "YKB")
 
+    override fun canParse(sender: String, message: String): Boolean =
+        super.canParse(sender, message) ||
+            normalizeDigits(message.trim()).startsWith("استلمت حوالة من ")
+
     private val incoming = Regex("""^استلمت حوالة من (.+?) بمبلغ (\d+(?:\.\d+)?) ر\.ي رصيدك (\d+(?:\.\d+)?) ر\.ي$""")
 
     override fun parse(smsId: String, sender: String, message: String, receivedAt: Long): PaymentCandidate {
