@@ -108,6 +108,34 @@ class GatewayRepository(
             )
         }
 
+        // If the process was killed after inserting the payment but before linking
+        // the raw SMS row, finish that link instead of creating a second payment.
+        val persistedPayment = if (existingSms?.processingStatus == SmsProcessingStatus.PENDING) {
+            paymentDao.getPaymentByInitialSmsId(smsId)
+        } else null
+        if (persistedPayment != null) {
+            val recoveryParser = parserRegistry.findParser(sender, body, detectedWallet)
+            val recoveryCandidate = recoveryParser?.parse(smsId, sender, body, receivedAt)
+            smsMessageDao.updateMessage(
+                rawSms.copy(
+                    paymentId = persistedPayment.paymentId,
+                    parsedAmount = recoveryCandidate?.amount,
+                    parsedTransactionId = recoveryCandidate?.transactionId,
+                    parsedSender = recoveryCandidate?.sender,
+                    processingStatus = if (persistedPayment.status == PaymentStatus.NEEDS_REVIEW)
+                        SmsProcessingStatus.NEEDS_REVIEW else SmsProcessingStatus.PROCESSED,
+                    parserUsed = recoveryParser?.parserVersion
+                )
+            )
+            logEvent("SMS_RECOVERED", "Recovered pending SMS link for payment ${persistedPayment.paymentId.take(8)}")
+            return@withLock ProcessSmsResult(
+                smsId = smsId,
+                paymentId = persistedPayment.paymentId,
+                status = persistedPayment.status,
+                message = "Recovered SMS/payment link after interrupted processing"
+            )
+        }
+
         // Retrieve Parser
         val parser = parserRegistry.findParser(sender, body, detectedWallet)
         if (parser == null) {

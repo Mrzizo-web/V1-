@@ -209,6 +209,51 @@ class GatewayRepositoryIdempotencyAndroidTest {
         assertEquals(PaymentStatus.FAILED, db.paymentDao().getAllPayments().first().single().status)
     }
 
+
+    @Test
+    fun pendingSmsWithAlreadyInsertedPaymentIsLinkedInsteadOfDuplicated() = runBlocking {
+        val smsId = "payment-inserted-before-crash"
+        val now = System.currentTimeMillis()
+        db.smsMessageDao().insertMessage(
+            SmsMessageEntity(
+                smsId = smsId,
+                receivedAt = now,
+                sender = "JEEB",
+                body = incomingJeeb,
+                wallet = WalletType.JEEB,
+                parsedAmount = null,
+                parsedTransactionId = null,
+                parsedSender = null,
+                paymentId = null,
+                processingStatus = SmsProcessingStatus.PENDING
+            )
+        )
+        val existingPayment = PaymentEntity(
+            paymentId = "already-created-payment",
+            transactionId = null,
+            wallet = WalletType.JEEB,
+            amount = 5000.0,
+            currency = "YER",
+            sender = "عبدالله الجميلي",
+            senderAccount = "77366225",
+            receivedAt = now,
+            confidence = 0.95f,
+            status = PaymentStatus.QUEUED,
+            parserVersion = "2.0-jeeb-real",
+            rawMessageSnippet = incomingJeeb.take(150),
+            initialSmsId = smsId
+        )
+        db.paymentDao().insertPayment(existingPayment)
+
+        val result = repository.processIncomingSms(smsId, "JEEB", incomingJeeb, now)
+        assertEquals("already-created-payment", result.paymentId)
+        assertEquals(1, db.paymentDao().getAllPayments().first().size)
+        assertEquals("already-created-payment", db.smsMessageDao().getMessageById(smsId)!!.paymentId)
+
+        repository.syncPendingPayments()
+        assertEquals(listOf("already-created-payment"), pos.sentEventIds.toList())
+    }
+
     private class RecordingPosGateway : PosGateway {
         val sentEventIds = Collections.synchronizedList(mutableListOf<String>())
         @Volatile var nextSuccess: Boolean = true

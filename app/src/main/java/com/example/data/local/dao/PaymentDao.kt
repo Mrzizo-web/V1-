@@ -24,6 +24,9 @@ interface PaymentDao {
     @Query("SELECT * FROM payments WHERE paymentId = :paymentId LIMIT 1")
     suspend fun getPaymentById(paymentId: String): PaymentEntity?
 
+    @Query("SELECT * FROM payments WHERE initialSmsId = :smsId LIMIT 1")
+    suspend fun getPaymentByInitialSmsId(smsId: String): PaymentEntity?
+
     @Query("SELECT * FROM payments WHERE wallet = :wallet AND transactionId = :txId LIMIT 1")
     suspend fun findByTransactionId(wallet: WalletType, txId: String): PaymentEntity?
 
