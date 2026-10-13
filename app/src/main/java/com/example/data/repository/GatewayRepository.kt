@@ -279,7 +279,7 @@ class GatewayRepository(
             )
         )
 
-        if (result.isSuccess) {
+        return if (result.isSuccess) {
             paymentDao.updateStatus(current.paymentId, PaymentStatus.ACKNOWLEDGED)
             logEvent("ACKNOWLEDGED", "$timeStr ACKNOWLEDGED by POS for payment ${current.paymentId.take(8)}", level = "SUCCESS")
             true
