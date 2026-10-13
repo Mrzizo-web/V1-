@@ -10,6 +10,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 object GatewaySecretStore {
+    const val MIN_TOKEN_LENGTH = 32
     private const val KEYSTORE = "AndroidKeyStore"
     private const val ALIAS = "POWER_FEUL_GATEWAY_TOKEN"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
