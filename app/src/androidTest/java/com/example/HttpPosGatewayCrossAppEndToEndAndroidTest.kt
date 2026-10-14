@@ -2,23 +2,17 @@ package com.example
 
 import android.content.ComponentName
 import android.content.Intent
-import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
-import com.example.data.local.AppDatabase
-import com.example.data.local.entity.GatewayConfigEntity
 import com.example.data.network.GatewayRequestSigner
 import com.example.data.network.HttpPosGateway
-import com.example.data.repository.GatewayRepository
 import com.example.domain.model.PaymentStatus
+import com.example.domain.model.SmsProcessingStatus
 import com.example.domain.model.WalletType
-import com.example.domain.parser.ParserRegistry
-import com.example.domain.parser.WalletDetector
-import com.example.security.GatewaySecretStore
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -28,113 +22,100 @@ import java.net.Socket
 import java.util.UUID
 
 /**
- * End-to-end emulator test: the separately packaged Gateway app's production
- * repository and HTTP client send a test SMS to the separately installed POS app's
- * production GatewayServer. No fake PosGateway and no fake POS HTTP server are used.
+ * End-to-end emulator test: a simulated incoming SMS is delivered through the
+ * Android telephony SMS_RECEIVED broadcast to the separate Gateway app's manifest
+ * receiver. The production repository parses and queues it, the production HTTP
+ * client sends it to the separately installed POS app's real server, and an
+ * authenticated readback proves that POS persisted the transaction.
  *
- * The SMS event is injected into GatewayRepository, not delivered by a SIM. Real
- * cellular SMS reception must still be verified on a physical Gateway phone.
+ * The Android emulator simulates the incoming SMS. Actual cellular/SIM reception
+ * must still be verified on a physical Gateway phone.
  */
 class HttpPosGatewayCrossAppEndToEndAndroidTest {
-    private lateinit var db: AppDatabase
     private lateinit var context: android.content.Context
-    private lateinit var posGateway: HttpPosGateway
-    private lateinit var repository: GatewayRepository
-    private var harnessStarted = false
+    private var posHarnessStarted = false
 
     @Before
     fun setUp() {
         context = InstrumentationRegistry.getInstrumentation().targetContext
-        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
-    }
-
-    @After
-    fun tearDown() {
-        if (harnessStarted) {
-            runCatching { launchPosHarness(stop = true) }
-        }
-        if (::db.isInitialized) db.close()
     }
 
     @Test
-    fun gatewayAppSendsSmsToSeparatePosAppAndPosPersistsTheWalletTransaction() = runBlocking {
-        val token = UUID.randomUUID().toString().replace("-", "") +
-            UUID.randomUUID().toString().replace("-", "")
-        val deviceId = "CROSS_APP_TEST_DEVICE"
-        val posPort = 18080
-        val receivedAt = System.currentTimeMillis()
-        val smsId = "sms-cross-app-${UUID.randomUUID()}"
-        val rawSms =
-            "استلمت حوالة من حاشد بزدان بمبلغ 800.00 ر.ي رصيدك 1500.00 ر.ي"
+    fun simulatedTelephonySmsTraversesGatewayReceiverHttpAndPersistsInSeparatePosApp() = runBlocking {
+        val app = context.applicationContext as GatewayApplication
+        val db = app.database
+        val repository = app.repository
+        val deviceId = "CI_EMULATOR_GATEWAY_01"
+        val port = 18080
+        val expectedSmsBody =
+            "استلمت حوالة من علي بمبلغ 800.00 ر.ي رصيدك 1500.00 ر.ي"
 
-        // Both apps are built on this same Android runner so the test-only POS
-        // activity's signature permission uses the same generated debug certificate.
-        launchPosHarness(token, deviceId, posPort, stop = false)
-        harnessStarted = true
+        // Configuration is written by the debug-only setup activity before this
+        // instrumentation test starts. This is the actual Gateway Room database.
+        val config = app.configRepository.getCurrentConfig()
+        assertEquals(deviceId, config.deviceId)
+        assertEquals("127.0.0.1", config.posIpAddress)
+        assertEquals(port, config.posPort)
+        assertTrue("Auto-sync is disabled for deterministic queue inspection", !config.isAutoSyncEnabled)
+        posHarnessStarted = true
 
-        db.gatewayConfigDao().insertOrUpdate(
-            GatewayConfigEntity(
-                deviceId = deviceId,
-                posIpAddress = "127.0.0.1",
-                posPort = posPort,
-                connectionMode = "WIFI_LAN",
-                isAutoSyncEnabled = false,
-                isGatewayActive = true,
-                gatewayToken = GatewaySecretStore.encrypt(context, token)
-            )
-        )
-
-        posGateway = HttpPosGateway(
+        val gatewayClient = HttpPosGateway(
             configDao = db.gatewayConfigDao(),
             smsMessageDao = db.smsMessageDao(),
             context = context
-        )
-        repository = GatewayRepository(
-            smsMessageDao = db.smsMessageDao(),
-            paymentDao = db.paymentDao(),
-            paymentAttemptDao = db.paymentAttemptDao(),
-            gatewayConfigDao = db.gatewayConfigDao(),
-            eventLogDao = db.eventLogDao(),
-            posGateway = posGateway,
-            walletDetector = WalletDetector(),
-            parserRegistry = ParserRegistry()
         )
 
         var connected = false
         val connectDeadline = System.currentTimeMillis() + 20_000L
         while (!connected && System.currentTimeMillis() < connectDeadline) {
-            connected = posGateway.checkConnection()
+            connected = gatewayClient.checkConnection()
             if (!connected) delay(250L)
         }
         assertTrue(
-            "The Gateway app's production HTTP client must reach the separate POS app's actual server",
+            "The Gateway app's production HTTP client must reach the separately installed POS app's real server",
             connected
         )
 
-        val processed = repository.processIncomingSms(
-            smsId = smsId,
-            sender = "YKB",
-            body = rawSms,
-            receivedAt = receivedAt
-        )
-        assertEquals("Incoming SMS should be parsed into a queued payment",
-            PaymentStatus.QUEUED, processed.status)
-        assertNotNull("A payment record should be created", processed.paymentId)
+        // adb emu sms send injects this exact text through Android's SMS_RECEIVED
+        // broadcast before the test starts. Wait for the production manifest receiver
+        // and repository to persist and parse it in the app's normal database.
+        var matchedSms: com.example.data.local.entity.SmsMessageEntity? = null
+        var matchedPayment: com.example.data.local.entity.PaymentEntity? = null
+        val smsDeadline = System.currentTimeMillis() + 20_000L
+        while (matchedPayment == null && System.currentTimeMillis() < smsDeadline) {
+            matchedSms = db.smsMessageDao().getAllMessages().first()
+                .firstOrNull { it.body == expectedSmsBody }
+            if (matchedSms != null && matchedSms.processingStatus != SmsProcessingStatus.PENDING) {
+                matchedPayment = db.paymentDao().getPaymentByInitialSmsId(matchedSms!!.smsId)
+            }
+            if (matchedPayment == null) delay(250L)
+        }
 
-        val delivered = repository.syncPendingPayments()
-        assertEquals("Exactly one payment should be acknowledged by POS", 1, delivered)
-        val savedPayment = repository.getPaymentById(processed.paymentId!!)
+        assertNotNull("Gateway SMS_RECEIVED receiver must persist the injected SMS body", matchedSms)
+        assertEquals(SmsProcessingStatus.PROCESSED, matchedSms!!.processingStatus)
+        assertNotNull("The production parser should create a payment from the SMS", matchedPayment)
+        assertEquals(WalletType.FLOOSAK, matchedPayment!!.wallet)
+        assertEquals(800.0, matchedPayment!!.amount, 0.001)
+        assertEquals(PaymentStatus.QUEUED, matchedPayment!!.status)
+        assertEquals(matchedSms!!.receivedAt, matchedPayment!!.receivedAt)
+
+        val sentCount = repository.syncPendingPayments()
+        assertEquals("Exactly one queued wallet payment should be acknowledged by POS", 1, sentCount)
+
+        val savedPayment = repository.getPaymentById(matchedPayment!!.paymentId)
         assertNotNull(savedPayment)
         assertEquals(PaymentStatus.ACKNOWLEDGED, savedPayment!!.status)
-        assertEquals(WalletType.FLOOSAK, savedPayment.wallet)
-        assertEquals(800.0, savedPayment.amount, 0.001)
-        assertEquals(receivedAt, savedPayment.receivedAt)
 
-        // Query the POS server itself with a second authenticated request. The
-        // returned data must be the data persisted in POS Room, not only a client ACK.
-        val response = sendSignedPosGet(token, deviceId, posPort, "/api/transactions")
+        // Authenticated readback from the actual POS server confirms DB persistence,
+        // not just the HTTP acknowledgement returned to Gateway.
+        val response = sendSignedPosGet(
+            token = config.gatewayToken.let {
+                com.example.security.GatewaySecretStore.decrypt(context, it)
+            },
+            deviceId = deviceId,
+            port = port,
+            path = "/api/transactions"
+        )
         assertTrue("POS transactions endpoint must return HTTP 200: $response",
             response.startsWith("HTTP/1.1 200"))
         val payload = JSONObject(response.substringAfter("\r\n\r\n"))
@@ -143,33 +124,31 @@ class HttpPosGatewayCrossAppEndToEndAndroidTest {
             .map { transactions.getJSONObject(it) }
             .firstOrNull {
                 it.optString("walletCode") == "FLOOSAK" &&
-                    it.optDouble("amount", -1.0) == 800.0 &&
-                    it.optLong("receivedAt", -1L) == receivedAt
+                    kotlin.math.abs(it.optDouble("amount", -1.0) - 800.0) < 0.001 &&
+                    it.optLong("receivedAt", -1L) == matchedSms!!.receivedAt
             }
         assertNotNull(
-            "The real POS app must persist the Floosak transaction with original receivedAt: $payload",
+            "The separate POS app must persist the Floosak transaction using the SMS's original receivedAt: $payload",
             transaction
         )
     }
 
-    private fun launchPosHarness(
-        token: String = "",
-        deviceId: String = "",
-        port: Int = 18080,
-        stop: Boolean
-    ) {
-        val intent = Intent().apply {
-            component = ComponentName(
-                "com.aistudio.powerfeulpos.wzkmqy",
-                "com.example.gateway.DebugGatewayIntegrationActivity"
-            )
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra("debug_gateway_integration_token", token)
-            putExtra("debug_gateway_integration_device_id", deviceId)
-            putExtra("debug_gateway_integration_port", port)
-            putExtra("debug_gateway_integration_stop", stop)
+    @org.junit.After
+    fun tearDown() {
+        if (posHarnessStarted) {
+            runCatching {
+                val intent = Intent().apply {
+                    component = ComponentName(
+                        "com.aistudio.powerfeulpos.wzkmqy",
+                        "com.example.gateway.DebugGatewayIntegrationActivity"
+                    )
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("debug_gateway_integration_stop", true)
+                    putExtra("debug_gateway_integration_port", 18080)
+                }
+                context.startActivity(intent)
+            }
         }
-        context.startActivity(intent)
     }
 
     private fun sendSignedPosGet(
