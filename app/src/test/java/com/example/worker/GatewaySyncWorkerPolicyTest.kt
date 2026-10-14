@@ -10,7 +10,7 @@ import org.junit.Test
 class GatewaySyncWorkerPolicyTest {
 
     private fun payment(status: PaymentStatus, retryCount: Int = 0) = PaymentEntity(
-        paymentId = "payment-${status.name}-$retryCount",
+        paymentId = "payment-${status.name}-${retryCount}",
         transactionId = null,
         wallet = WalletType.JAWALI,
         amount = 5000.0,
@@ -25,16 +25,16 @@ class GatewaySyncWorkerPolicyTest {
 
     @Test
     fun queuedPaymentsAlwaysRemainEligibleForSync() {
-        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.QUEUED)), 5))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.QUEUED))))
     }
 
     @Test
-    fun failedAndSentPaymentsRetryOnlyBelowConfiguredLimit() {
-        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 2)), 5))
-        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 4)), 5))
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 5)), 5))
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 6)), 5))
-        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 0)), 0))
+    fun failedAndSentPaymentsKeepRetryingAfterRepeatedOutages() {
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 2))))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 4))))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 5))))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 6))))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 1000))))
     }
 
     @Test
@@ -46,11 +46,11 @@ class GatewaySyncWorkerPolicyTest {
             payment(PaymentStatus.PARSED),
             payment(PaymentStatus.PARSING)
         )
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(nonRetryable, 5))
+        assertFalse(GatewaySyncWorker.hasRetryablePayments(nonRetryable))
     }
 
     @Test
     fun emptyQueueDoesNotRequestAnotherRetry() {
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(emptyList(), 5))
+        assertFalse(GatewaySyncWorker.hasRetryablePayments(emptyList()))
     }
 }

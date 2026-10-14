@@ -383,15 +383,20 @@ class GatewayRepository(
             if (config?.isGatewayActive == false) return@withLock 0
 
             val now = System.currentTimeMillis()
-            val maxAttempts = (config?.maxRetryCount ?: 5).coerceAtLeast(1)
+            val attemptsBeforeSlowerRetry = (config?.maxRetryCount ?: 5).coerceAtLeast(1)
             val retryDelayMillis = (config?.retryDelaySeconds ?: 15).coerceAtLeast(1) * 1000L
             val pending = paymentDao.getPendingSyncPayments().filter { payment ->
                 when (payment.status) {
                     PaymentStatus.QUEUED -> true
-                    PaymentStatus.FAILED, PaymentStatus.SENT ->
-                        payment.retryCount < maxAttempts &&
-                            (payment.lastSyncAttemptAt == null ||
-                                now - payment.lastSyncAttemptAt >= retryDelayMillis)
+                    PaymentStatus.FAILED, PaymentStatus.SENT -> {
+                        // A temporary outage must never permanently strand a wallet transfer.
+                        // After the configured attempt threshold, retry less frequently but
+                        // keep retrying until POS acknowledges it or manual review is required.
+                        val requiredDelay = if (payment.retryCount >= attemptsBeforeSlowerRetry)
+                            retryDelayMillis * 4L else retryDelayMillis
+                        payment.lastSyncAttemptAt == null ||
+                            now - payment.lastSyncAttemptAt >= requiredDelay
+                    }
                     else -> false
                 }
             }

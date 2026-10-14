@@ -93,7 +93,7 @@ class HttpPosGateway(
                 return@withContext PosAckResponse(
                     isSuccess = false,
                     httpStatusCode = null,
-                    errorMessage = "Cleartext POS communication is restricted to a private local-network host"
+                    errorMessage = "Cleartext POS communication is restricted to a private LAN or VPN address"
                 )
             }
 
