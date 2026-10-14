@@ -139,11 +139,7 @@ jobs:
             DEVICE_ID="CI_EMULATOR_GATEWAY_01"
             SMS_BODY='استلمت حوالة من علي بمبلغ 800.00 ر.ي رصيدك 1500.00 ر.ي'
             adb logcat -c
-            adb shell am start -n com.aistudio.powerfuelgateway.yqnw/com.example.DebugGatewayIntegrationActivity \
-              --es debug_gateway_integration_token "$TEST_TOKEN" \
-              --es debug_gateway_integration_device_id "$DEVICE_ID" \
-              --es debug_gateway_integration_pos_ip 127.0.0.1 \
-              --ei debug_gateway_integration_pos_port 18080
+            adb shell am start -n com.aistudio.powerfuelgateway.yqnw/com.example.DebugGatewayIntegrationActivity --es debug_gateway_integration_token "$TEST_TOKEN" --es debug_gateway_integration_device_id "$DEVICE_ID" --es debug_gateway_integration_pos_ip 127.0.0.1 --ei debug_gateway_integration_pos_port 18080
             READY=0
             for attempt in $(seq 1 60); do
               if adb logcat -d -s GatewayIntegrationFixture:I | grep -q 'GATEWAY_CONFIG_READY'; then
