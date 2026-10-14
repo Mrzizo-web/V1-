@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="com.aistudio.powerfeulpos.wzkmqy.permission.DEBUG_GATEWAY_INTEGRATION" />
+
+    <application>
+        <activity
+            android:name=".DebugGatewayIntegrationActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@style/Theme.MyApplication" />
+    </application>
+</manifest>
