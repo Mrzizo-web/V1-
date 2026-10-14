@@ -1,13 +1,14 @@
 package com.example
 
 import android.app.Application
+import android.util.Log
 import com.example.data.local.AppDatabase
 import com.example.data.network.HttpPosGateway
 import com.example.data.repository.GatewayConfigRepository
 import com.example.data.repository.GatewayRepository
 import com.example.domain.parser.ParserRegistry
 import com.example.domain.parser.WalletDetector
-import com.example.service.GatewayForegroundService
+import com.example.worker.GatewaySyncScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,14 +51,21 @@ class GatewayApplication : Application() {
             parserRegistry = parserRegistry
         )
 
-        // Boot logging and auto service start
+        // Android initializes WorkManager through its startup provider on-device.
+        // Unit-test host processes may not run that provider, so scheduling failure
+        // must not prevent parsers, Room, or the login screen from starting.
+        // The periodic job is registered again on boot and on next app launch.
+        runCatching { GatewaySyncScheduler.schedulePeriodic(this) }.onFailure { error ->
+            Log.w("GatewayApplication", "Could not register periodic background sync", error)
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 repository.recoverPendingSms()
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 repository.logEvent(
                     tag = "SMS_RECOVERY_STARTUP_ERROR",
-                    message = "Could not recover pending SMS after app startup: " + error.message,
+                    message = "Could not recover pending SMS after app startup",
                     level = "ERROR"
                 )
             }
@@ -70,16 +78,12 @@ class GatewayApplication : Application() {
 
             repository.logEvent(
                 tag = "APP_START",
-                message = "POWER FEUL SMS GATEWAY initialized (Device ID: ${config.deviceId})",
+                message = "POWER FEUL SMS GATEWAY initialized (Device ID configured)",
                 level = "INFO"
             )
 
-            if (config.isGatewayActive) {
-                try {
-                    GatewayForegroundService.startService(this@GatewayApplication)
-                } catch (_: Exception) {
-                    // Handled if background start restrictions apply
-                }
+            if (config.isGatewayActive && config.isAutoSyncEnabled) {
+                runCatching { GatewaySyncScheduler.enqueueImmediate(this@GatewayApplication) }
             }
         }
     }
