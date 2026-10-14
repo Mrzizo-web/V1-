@@ -31,7 +31,7 @@ class GatewaySyncWorker(
 
             app.repository.syncPendingPayments()
             val pending = app.database.paymentDao().getPendingSyncPayments()
-            if (hasRetryablePayments(pending, config.maxRetryCount.coerceAtLeast(1))) {
+            if (hasRetryablePayments(pending)) {
                 Result.retry()
             } else {
                 Result.success()
@@ -57,18 +57,13 @@ class GatewaySyncWorker(
          * remain retryable indefinitely; the repository slows retry frequency after the
          * configured threshold so a long outage cannot silently strand wallet transfers.
          */
-        internal fun hasRetryablePayments(
-            payments: List<PaymentEntity>,
-            maxAttempts: Int
-        ): Boolean {
-            val limit = maxAttempts.coerceAtLeast(1)
-            return payments.any { payment ->
+        internal fun hasRetryablePayments(payments: List<PaymentEntity>): Boolean =
+            payments.any { payment ->
                 when (payment.status) {
                     PaymentStatus.QUEUED -> true
                     PaymentStatus.FAILED, PaymentStatus.SENT -> true
                     else -> false
                 }
             }
-        }
     }
 }
