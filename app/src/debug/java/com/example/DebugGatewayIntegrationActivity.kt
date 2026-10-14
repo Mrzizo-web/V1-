@@ -7,13 +7,16 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.work.WorkManager
 import com.example.data.local.entity.GatewayConfigEntity
 import com.example.data.network.LocalNetworkHostPolicy
 import com.example.security.GatewaySecretStore
+import com.example.worker.GatewaySyncScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.TimeUnit
 
 /**
  * Debug-only CI setup helper. It configures this Gateway app with a test token and
@@ -58,6 +61,15 @@ class DebugGatewayIntegrationActivity : Activity() {
                 check(applicationReady) {
                     "GatewayApplication startup did not finish within 15 seconds"
                 }
+
+                // Let startup finish its immediate-work enqueue, then cancel that
+                // initial sync. The test sends its SMS only after this deterministic
+                // test configuration has disabled automatic synchronization.
+                delay(500L)
+                WorkManager.getInstance(applicationContext)
+                    .cancelUniqueWork(GatewaySyncScheduler.IMMEDIATE_WORK_NAME)
+                    .result
+                    .get(10, TimeUnit.SECONDS)
 
                 val encryptedToken = GatewaySecretStore.encrypt(applicationContext, token)
                 runBlocking(Dispatchers.IO) {
