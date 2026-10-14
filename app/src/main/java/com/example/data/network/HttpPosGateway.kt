@@ -26,6 +26,9 @@ class HttpPosGateway(
         .connectTimeout(4, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
         .writeTimeout(6, TimeUnit.SECONDS)
+        // SMS/payment payloads must never be forwarded to a redirect target.
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 ) : PosGateway {
 
