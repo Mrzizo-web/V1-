@@ -188,9 +188,14 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = posIp,
                     onValueChange = { posIp = it },
-                    label = { Text("POS IP Address (Local Wi-Fi)") },
+                    label = { Text("POS IP Address (LAN / VPN)") },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = isUnlocked
+                )
+                Text(
+                    text = "إذا كان الهاتف والتابلت على شبكتين مختلفتين، أدخل عنوان VPN الخاص بالتابلت (مثل عنوان Tailscale الذي يبدأ بـ 100.).",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
