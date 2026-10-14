@@ -4,9 +4,9 @@ import java.net.Inet6Address
 import java.net.InetAddress
 
 /**
- * HTTP is used only for the local POS gateway. HMAC protects request authenticity
- * and integrity; this allowlist prevents a misconfigured IP field from sending
- * wallet data over cleartext HTTP to a public internet host.
+ * HTTP is used only for private LAN/VPN POS endpoints. RFC1918 LAN hosts, loopback,
+ * link-local, ULA IPv6, and the CGNAT range used by Tailscale-style overlay VPNs are
+ * permitted. HMAC still authenticates each request; public Internet hosts are rejected.
  */
 object LocalNetworkHostPolicy {
     fun isAllowedCleartextHost(host: String): Boolean {
@@ -29,6 +29,8 @@ object LocalNetworkHostPolicy {
         val a = numbers[0]
         val b = numbers[1]
         return a == 10 ||
+            // Overlay VPNs such as Tailscale assign peer addresses from RFC 6598.
+            (a == 100 && b in 64..127) ||
             (a == 172 && b in 16..31) ||
             (a == 192 && b == 168) ||
             (a == 169 && b == 254) ||
