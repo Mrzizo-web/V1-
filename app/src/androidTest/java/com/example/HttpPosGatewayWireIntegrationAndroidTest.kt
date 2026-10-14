@@ -119,7 +119,7 @@ class HttpPosGatewayWireIntegrationAndroidTest {
             assertEquals("POST /api/sms/ingest HTTP/1.1", captured.requestLine)
             assertEquals(eventId, captured.headers["x-gateway-event-id"])
             assertEquals(deviceId, captured.headers["x-gateway-device-id"])
-            assertEquals("application/json; charset=UTF-8", captured.headers["content-type"])
+            assertEquals("application/json; charset=utf-8", captured.headers["content-type"])
             assertTrue(
                 "HMAC must verify over the exact UTF-8 body sent on the socket",
                 GatewayRequestSigner.verify(
