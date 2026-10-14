@@ -90,7 +90,7 @@ jobs:
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: gradle connectedDebugAndroidTest
+          script: gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.example.HttpPosGatewayCrossAppEndToEndAndroidTest
 
   cross-app-instrumentation:
     runs-on: ubuntu-latest
