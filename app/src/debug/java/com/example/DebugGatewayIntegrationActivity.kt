@@ -34,45 +34,44 @@ class DebugGatewayIntegrationActivity : Activity() {
 
         Thread {
             val setupSucceeded = runCatching {
-                require(token.length >= GatewaySecretStore.MIN_TOKEN_LENGTH) {
-                    "Integration token must contain at least 32 characters"
-                }
-                require(deviceId.isNotBlank()) { "Integration device ID is required" }
-                require(LocalNetworkHostPolicy.isAllowedCleartextHost(posIp)) {
-                    "Integration POS host must be local/private"
-                }
-                require(posPort in 1024..65535) { "Integration POS port is invalid" }
-
-                val app = application as GatewayApplication
-
-                // GatewayApplication starts a coroutine during Application.onCreate.
-                // Wait until its default config/bootstrap has settled before writing the
-                // test override, otherwise a concurrent default insert can overwrite it.
-                val startupDeadline = System.currentTimeMillis() + 15_000L
-                var applicationReady = false
-                while (System.currentTimeMillis() < startupDeadline) {
-                    val recent = app.database.eventLogDao().getRecentLogs().first()
-                    if (recent.any { it.tag == "APP_START" }) {
-                        applicationReady = true
-                        break
-                    }
-                    delay(100L)
-                }
-                check(applicationReady) {
-                    "GatewayApplication startup did not finish within 15 seconds"
-                }
-
-                // Let startup finish its immediate-work enqueue, then cancel that
-                // initial sync. The test sends its SMS only after this deterministic
-                // test configuration has disabled automatic synchronization.
-                delay(500L)
-                WorkManager.getInstance(applicationContext)
-                    .cancelUniqueWork(GatewaySyncScheduler.IMMEDIATE_WORK_NAME)
-                    .result
-                    .get(10, TimeUnit.SECONDS)
-
-                val encryptedToken = GatewaySecretStore.encrypt(applicationContext, token)
                 runBlocking(Dispatchers.IO) {
+                    require(token.length >= GatewaySecretStore.MIN_TOKEN_LENGTH) {
+                        "Integration token must contain at least 32 characters"
+                    }
+                    require(deviceId.isNotBlank()) { "Integration device ID is required" }
+                    require(LocalNetworkHostPolicy.isAllowedCleartextHost(posIp)) {
+                        "Integration POS host must be local/private"
+                    }
+                    require(posPort in 1024..65535) { "Integration POS port is invalid" }
+
+                    val app = application as GatewayApplication
+
+                    // GatewayApplication starts a coroutine during Application.onCreate.
+                    // Wait until its default config/bootstrap has settled before writing
+                    // the test override, otherwise a concurrent default insert can overwrite it.
+                    val startupDeadline = System.currentTimeMillis() + 15_000L
+                    var applicationReady = false
+                    while (System.currentTimeMillis() < startupDeadline) {
+                        val recent = app.database.eventLogDao().getRecentLogs().first()
+                        if (recent.any { it.tag == "APP_START" }) {
+                            applicationReady = true
+                            break
+                        }
+                        delay(100L)
+                    }
+                    check(applicationReady) {
+                        "GatewayApplication startup did not finish within 15 seconds"
+                    }
+
+                    // Let startup finish its immediate-work enqueue, then cancel that
+                    // initial sync. The test sends its SMS only after deterministic setup.
+                    delay(500L)
+                    WorkManager.getInstance(applicationContext)
+                        .cancelUniqueWork(GatewaySyncScheduler.IMMEDIATE_WORK_NAME)
+                        .result
+                        .get(10, TimeUnit.SECONDS)
+
+                    val encryptedToken = GatewaySecretStore.encrypt(applicationContext, token)
                     app.database.gatewayConfigDao().insertOrUpdate(
                         GatewayConfigEntity(
                             deviceId = deviceId,
