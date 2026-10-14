@@ -53,8 +53,9 @@ class GatewaySyncWorker(
 
     companion object {
         /**
-         * Never automatically send items awaiting manual review. Failed/SENT rows
-         * retry only while below the configured attempt limit.
+         * Never automatically send items awaiting manual review. FAILED/SENT rows
+         * remain retryable indefinitely; the repository slows retry frequency after the
+         * configured threshold so a long outage cannot silently strand wallet transfers.
          */
         internal fun hasRetryablePayments(
             payments: List<PaymentEntity>,
@@ -64,7 +65,7 @@ class GatewaySyncWorker(
             return payments.any { payment ->
                 when (payment.status) {
                     PaymentStatus.QUEUED -> true
-                    PaymentStatus.FAILED, PaymentStatus.SENT -> payment.retryCount < limit
+                    PaymentStatus.FAILED, PaymentStatus.SENT -> true
                     else -> false
                 }
             }
