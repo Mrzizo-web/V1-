@@ -256,7 +256,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = maxRetries,
                         onValueChange = { maxRetries = it },
-                        label = { Text("عدد المحاولات") },
+                        label = { Text("محاولات قبل إبطاء الإعادة") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                         enabled = isUnlocked
@@ -270,6 +270,11 @@ fun SettingsScreen(
                         enabled = isUnlocked
                     )
                 }
+                Text(
+                    text = "لا تُحذف الحوالات عند انقطاع الاتصال؛ تستمر الإعادة بالخلفية، ويطول الفاصل بعد هذا العدد.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
