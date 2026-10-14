@@ -6,10 +6,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.example.data.local.entity.GatewayConfigEntity
 import com.example.data.network.LocalNetworkHostPolicy
 import com.example.security.GatewaySecretStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -38,6 +41,24 @@ class DebugGatewayIntegrationActivity : Activity() {
                 require(posPort in 1024..65535) { "Integration POS port is invalid" }
 
                 val app = application as GatewayApplication
+
+                // GatewayApplication starts a coroutine during Application.onCreate.
+                // Wait until its default config/bootstrap has settled before writing the
+                // test override, otherwise a concurrent default insert can overwrite it.
+                val startupDeadline = System.currentTimeMillis() + 15_000L
+                var applicationReady = false
+                while (System.currentTimeMillis() < startupDeadline) {
+                    val recent = app.database.eventLogDao().getRecentLogs().first()
+                    if (recent.any { it.tag == "APP_START" }) {
+                        applicationReady = true
+                        break
+                    }
+                    delay(100L)
+                }
+                check(applicationReady) {
+                    "GatewayApplication startup did not finish within 15 seconds"
+                }
+
                 val encryptedToken = GatewaySecretStore.encrypt(applicationContext, token)
                 runBlocking(Dispatchers.IO) {
                     app.database.gatewayConfigDao().insertOrUpdate(
@@ -68,9 +89,16 @@ class DebugGatewayIntegrationActivity : Activity() {
                         putExtra("debug_gateway_integration_stop", false)
                     }
                     runCatching { startActivity(posIntent) }
-                        .onFailure { setResult(RESULT_CANCELED) }
-                        .onSuccess { setResult(RESULT_OK) }
+                        .onFailure {
+                            Log.e(TAG, "Could not start the POS debug integration harness", it)
+                            setResult(RESULT_CANCELED)
+                        }
+                        .onSuccess {
+                            Log.i(TAG, "GATEWAY_CONFIG_READY")
+                            setResult(RESULT_OK)
+                        }
                 } else {
+                    Log.e(TAG, "Gateway integration setup failed")
                     setResult(RESULT_CANCELED)
                 }
                 finish()
@@ -84,5 +112,6 @@ class DebugGatewayIntegrationActivity : Activity() {
         const val EXTRA_POS_IP = "debug_gateway_integration_pos_ip"
         const val EXTRA_POS_PORT = "debug_gateway_integration_pos_port"
         const val DEFAULT_PORT = 18080
+        private const val TAG = "GatewayIntegrationFixture"
     }
 }
