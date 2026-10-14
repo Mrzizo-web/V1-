@@ -29,11 +29,12 @@ class GatewaySyncWorkerPolicyTest {
     }
 
     @Test
-    fun failedAndSentPaymentsRetryOnlyBelowConfiguredLimit() {
+    fun failedAndSentPaymentsKeepRetryingAfterConfiguredThreshold() {
         assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 2)), 5))
         assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 4)), 5))
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 5)), 5))
-        assertFalse(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 6)), 5))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 5)), 5))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.SENT, 6)), 5))
+        assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 1000)), 5))
         assertTrue(GatewaySyncWorker.hasRetryablePayments(listOf(payment(PaymentStatus.FAILED, 0)), 0))
     }
 
